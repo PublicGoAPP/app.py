@@ -5,39 +5,19 @@ import google.generativeai as genai
 from datetime import datetime
 import time
 
-# --- CONFIGURACIÓN DE IA ULTRA-RESILIENTE (v73.0) ---
+# --- CONFIGURACIÓN DE IA (RESTAURADA) ---
 def conectar_ia():
     if "GOOGLE_API_KEY" not in st.secrets:
         st.error("❌ Falta la clave en Secrets.")
         return None
-    
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    
-    # Lista exhaustiva de todas las formas posibles de llamar al modelo
-    nombres_posibles = [
-        'gemini-1.5-flash',
-        'models/gemini-1.5-flash',
-        'gemini-1.5-flash-latest',
-        'models/gemini-1.5-flash-latest',
-        'gemini-pro' # Último recurso si Flash falla
-    ]
-    
-    for nombre in nombres_posibles:
-        try:
-            # Intentamos inicializar
-            modelo_prueba = genai.GenerativeModel(nombre)
-            # Intentamos una respuesta ultra corta para validar que el modelo existe y responde
-            modelo_prueba.generate_content("ok", generation_config={"max_output_tokens": 1})
-            return modelo_prueba
-        except:
-            continue
-    return None
+    return genai.GenerativeModel('gemini-1.5-flash')
 
 model = conectar_ia()
 
-st.set_page_config(page_title="Public Go Elite v73", layout="wide")
+st.set_page_config(page_title="Public Go Elite v69", layout="wide")
 
-# --- ESTILOS ---
+# --- ESTILOS VISUALES ORIGINALES (RECUPERADOS) ---
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
@@ -47,30 +27,29 @@ st.markdown("""
     .analysis-box { background-color: #f8f9fa; padding: 18px; border-right: 5px solid #003b5c; border-radius: 5px; font-size: 0.95rem; line-height: 1.5; color: #333; }
     .news-item { border-bottom: 1px solid #f0f0f0; padding: 12px 0; }
     .news-link { color: #003b5c; text-decoration: none; font-weight: 500; font-size: 1.05rem; }
+    .ref-tag { color: #003b5c; font-weight: bold; margin-right: 5px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- MOTOR DE CÁLCULO ---
+# --- LÓGICA DE VARIACIÓN ---
 def calcular_variacion_real(alcance):
     tasa_actual = 417.3579
     cierres = {"Hoy": 414.0594, "Semana": 412.2030, "Mes": 401.3055}
-    precio_previo = cierres.get(alcance, 414.0594)
+    precio_previo = cierres.get(alcance)
     variacion_pct = ((tasa_actual - precio_previo) / precio_previo) * 100
     return tasa_actual, variacion_pct
 
-# --- ANÁLISIS ---
+# --- FUNCIONES DE IA ---
 def generar_analisis_categoria(cat, data, alcance):
-    if not model:
-        return "⚠️ Error crítico: Google no reconoce ningún modelo disponible para esta clave."
-    
     titulares = "".join([f"[{i}] {n['titulo'].split(' - ')[0]} " for i, n in enumerate(data, 1)])
-    prompt = f"Analista Senior Public Go. Venezuela ({alcance}). Hechos: {titulares}. Tarea: Impacto y recomendación estratégica. Sin saludos. Usa [n]."
-    
+    prompt = f"Eres Directora de Public Go. Analiza {cat} en Venezuela ({alcance}): {titulares}. Sin saludos. Usa [n]. Recomendación final."
     try:
         res = model.generate_content(prompt)
         return res.text.strip()
     except Exception as e:
-        return f"⚠️ Error en la generación: {str(e)}"
+        if "429" in str(e):
+            return "⚠️ El servidor de Google está saturado. Espere 15 segundos antes de intentar esta categoría nuevamente."
+        return "⚠️ Error de conexión con la inteligencia."
 
 @st.cache_data(ttl=600)
 def buscar_rss(query, periodo):
@@ -84,50 +63,60 @@ def buscar_rss(query, periodo):
     except: pass
     return results
 
-# --- INTERFAZ ---
+# --- INTERFAZ SIDEBAR ---
 with st.sidebar:
     st.title("🛡️ Public Go")
-    alcance = st.radio("Filtro:", ["Hoy", "Semana", "Mes"])
+    alcance = st.radio("Filtro Temporal:", ["Hoy", "Semana", "Mes"])
     st.divider()
-    tasa, var = calcular_variacion_real(alcance)
-    st.metric("Tasa BCV", f"{tasa:.4f} Bs", f"{var:+.2f}%")
+    tasa, variacion = calcular_variacion_real(alcance)
+    st.metric(label="Tasa Oficial BCV", value=f"{tasa:.4f} Bs", delta=f"{variacion:+.2f}%")
+    st.metric("Riesgo País (EMBI)", "18,450 bps", "-50 bps", delta_color="inverse")
+    st.divider()
+    st.write("📊 **Monitor de Energía**")
+    st.caption("Cesta OPEP: $79.40 (+0.5%)")
 
+# --- CUERPO PRINCIPAL ---
 st.title("🛡️ Public Go: Strategic Insight Dashboard")
-st.write(f"Corte: **27/02/2026**")
-
-if model is None:
-    st.error("❌ Fallo total de conexión con los modelos de Google. Por favor, verifica que la clave en Secrets sea correcta y no tenga espacios.")
+st.write(f"Corte Informativo: **27/02/2026**")
 
 CATEGORIAS = {
-    "🏛️ GOBIERNO": 'Venezuela (Larry Devoe OR Tarek William Saab OR Delcy Rodriguez)',
-    "🛢️ ENERGÍA": 'Venezuela (Shell OR Chevron OR PDVSA OR gas)',
-    "💰 ECONOMÍA": 'Venezuela (bcv OR dólar OR tasa OR pib)',
-    "🌎 RELACIONES": 'Venezuela (Trump OR sanciones OR Washington)'
+    "🏛️ GOBIERNO": 'Venezuela (Delcy OR Diosdado OR Fiscal General OR ministro OR nombramiento OR renuncia)',
+    "🛢️ ENERGÍA": 'Venezuela (Shell OR Chevron OR Repsol OR petróleo OR gas OR PDVSA OR energía OR Licencia)',
+    "💰 ECONOMÍA": 'Venezuela (bcv OR dólar OR tasa OR pib OR crecimiento OR consumidor OR inversión OR arancel)',
+    "🌎 RELACIONES": 'Venezuela (Trump OR Marco Rubio OR Washintong OR sanciones OR Laura Dogu)'
 }
 codigos = {"Hoy": "1d", "Semana": "7d", "Mes": "30d"}
 
-if 'ver' not in st.session_state: st.session_state['ver'] = False
-if 'analisis' not in st.session_state: st.session_state['analisis'] = {}
-
-if st.button("🚀 INICIAR MONITOREO"):
-    st.session_state['ver'] = True
+if 'analisis' not in st.session_state:
     st.session_state['analisis'] = {}
 
-if st.session_state['ver']:
+if st.button("🚀 ANÁLISIS INFORMATIVO E INTELIGENCIA"):
+    st.session_state['ver_noticias'] = True
+    st.session_state['analisis'] = {} 
+
+if st.session_state.get('ver_noticias'):
     for cat, q in CATEGORIAS.items():
         st.markdown(f"<div class='cat-header'>{cat}</div>", unsafe_allow_html=True)
         noticias = buscar_rss(q, codigos[alcance])
+        
         if noticias:
-            c1, c2 = st.columns([2, 1.2])
-            with c1:
+            col_n, col_d = st.columns([2, 1.2])
+            with col_n:
+                st.write("**📌 Noticias**")
                 for j, n in enumerate(noticias, 1):
-                    st.markdown(f"[{j}] <a href='{n['link']}' target='_blank' class='news-link'>{n['titulo'].split(' - ')[0]}</a>", unsafe_allow_html=True)
-            with c2:
-                if st.button(f"🔍 Analizar {cat}", key=cat):
-                    with st.spinner("Analizando..."):
-                        st.session_state['analisis'][cat] = generar_analisis_categoria(cat, noticias, alcance)
+                    st.markdown(f"<div class='news-item'><span class='ref-tag'>[{j}]</span><a href='{n['link']}' target='_blank' class='news-link'>{n['titulo'].split(' - ')[0]}</a></div>", unsafe_allow_html=True)
+            
+            with col_d:
+                st.write("**🧠 Análisis de Inteligencia**")
+                if st.button(f"🔍 Analizar {cat}", key=f"btn_{cat}"):
+                    with st.spinner("Generando inteligencia estratégica..."):
+                        res = generar_analisis_categoria(cat, noticias, alcance)
+                        st.session_state['analisis'][cat] = res
+                
                 if cat in st.session_state['analisis']:
                     st.markdown(f"<div class='analysis-box'>{st.session_state['analisis'][cat]}</div>", unsafe_allow_html=True)
+        else:
+            st.info(f"Sin novedades en {cat}.")
 
 st.divider()
-st.caption("Public Go Elite v73.0 | Protocolo de Inferencia Directa Activado.")
+st.caption("Uso exclusivo Public Go Consultores.")
