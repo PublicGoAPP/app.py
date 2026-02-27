@@ -5,14 +5,20 @@ import google.generativeai as genai
 from datetime import datetime
 import time
 
-# --- CONFIGURACIÓN DE IA (Preparada para Cuota de Pago) ---
+# --- CONFIGURACIÓN DE IA (REPARADA PARA NIVEL 1) ---
 def conectar_ia():
     if "GOOGLE_API_KEY" not in st.secrets:
         st.error("❌ Falta la clave en Secrets.")
         return None
-   genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-model = genai.GenerativeModel('gemini-1.5-flash') # Quitamos el prefijo models/
+    try:
+        genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+        # Para cuentas de pago, usamos el modelo directo sin prefijos
+        return genai.GenerativeModel('gemini-1.5-flash')
+    except Exception as e:
+        st.error(f"Error de configuración: {e}")
+        return None
 
+# Inicializamos el modelo correctamente
 model = conectar_ia()
 
 st.set_page_config(page_title="Public Go Elite v74", layout="wide")
@@ -24,8 +30,8 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #003b5c !important; }
     [data-testid="stSidebar"] * { color: #ffffff !important; }
     .cat-header { background-color: #003b5c; color: white; padding: 10px; border-radius: 5px; font-weight: bold; margin-top: 25px; text-transform: uppercase; }
-    .risk-high { border-left: 8px solid #d9534f; background-color: #fff5f5; padding: 15px; border-radius: 5px; }
-    .risk-med { border-left: 8px solid #f0ad4e; background-color: #fff9f0; padding: 15px; border-radius: 5px; }
+    .risk-high { border-left: 8px solid #d9534f; background-color: #fff5f5; padding: 15px; border-radius: 5px; color: #333; }
+    .risk-med { border-left: 8px solid #f0ad4e; background-color: #fff9f0; padding: 15px; border-radius: 5px; color: #333; }
     .news-item { border-bottom: 1px solid #f0f0f0; padding: 12px 0; }
     .news-link { color: #003b5c; text-decoration: none; font-weight: 500; font-size: 1.05rem; }
     </style>
@@ -33,8 +39,10 @@ st.markdown("""
 
 # --- CAPA DE INTELIGENCIA DE RIESGO ---
 def generar_analisis_riesgo(cat, data, alcance):
+    if not model:
+        return "⚠️ IA no configurada. Revisa los Secrets."
+    
     titulares = "".join([f"[{i}] {n['titulo'].split(' - ')[0]} " for i, n in enumerate(data, 1)])
-    # Prompt enfocado en Riesgo Político y Corporativo
     prompt = f"""
     Actúa como Directora de Riesgo de Public Go. 
     Analiza estos hechos en Venezuela ({alcance}): {titulares}
@@ -67,7 +75,7 @@ with st.sidebar:
     st.title("🛡️ Public Go")
     alcance = st.radio("Filtro:", ["Hoy", "Semana", "Mes"])
     st.divider()
-    st.metric("Tasa BCV", "417.35 Bs", "+0.79%") # Simulado para estabilidad de UI
+    st.metric("Tasa BCV", "417.35 Bs", "+0.79%")
     st.metric("EMBI (Riesgo País)", "18,450 bps", "-50 bps", delta_color="inverse")
 
 # --- CUERPO PRINCIPAL ---
@@ -98,10 +106,10 @@ if st.session_state.get('ver'):
                     st.markdown(f"<div class='news-item'>[{j}] <a href='{n['link']}' target='_blank' class='news-link'>{n['titulo'].split(' - ')[0]}</a></div>", unsafe_allow_html=True)
             with c2:
                 st.write("**🧠 Análisis de Riesgo**")
+                # El botón de análisis por categoría
                 if st.button(f"🔍 Evaluar Riesgo {cat}", key=cat):
                     with st.spinner("Calculando impacto..."):
                         analisis = generar_analisis_riesgo(cat, noticias, alcance)
-                        # Clase visual según riesgo
                         clase = "risk-high" if "ALTO" in analisis.upper() else "risk-med"
                         st.markdown(f"<div class='{clase}'>{analisis}</div>", unsafe_allow_html=True)
 
