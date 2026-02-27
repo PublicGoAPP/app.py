@@ -5,20 +5,21 @@ import google.generativeai as genai
 from datetime import datetime
 import time
 
-# --- CONFIGURACIÓN DE IA (REPARADA PARA NIVEL 1) ---
+# --- CONFIGURACIÓN DE IA (REPARADA PARA CUENTA PRO) ---
 def conectar_ia():
     if "GOOGLE_API_KEY" not in st.secrets:
         st.error("❌ Falta la clave en Secrets.")
         return None
     try:
+        # Forzamos el uso de la versión estable (v1) en lugar de la beta
         genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-        # Para cuentas de pago, usamos el modelo directo sin prefijos
-        return genai.GenerativeModel('gemini-1.5-flash')
+        # IMPORTANTE: En cuentas Pro, se usa el nombre del modelo sin prefijos
+        return genai.GenerativeModel(model_name='gemini-1.5-flash')
     except Exception as e:
         st.error(f"Error de configuración: {e}")
         return None
 
-# Inicializamos el modelo correctamente
+# Inicialización correcta
 model = conectar_ia()
 
 st.set_page_config(page_title="Public Go Elite v74", layout="wide")
