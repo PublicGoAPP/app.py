@@ -3,96 +3,110 @@ import requests
 from bs4 import BeautifulSoup
 import google.generativeai as genai
 from datetime import datetime
+import time
 
-# --- CONEXIÓN IA (Versión Pro Estable) ---
+# --- CONFIGURACIÓN DE IA (REPARADA PARA CUOTA DE PAGO) ---
 def conectar_ia():
     if "GOOGLE_API_KEY" not in st.secrets:
+        st.error("❌ Falta la clave en Secrets.")
         return None
     try:
         genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+        # Eliminamos el prefijo 'models/' que causa el error 404 en cuentas Pro
         return genai.GenerativeModel('gemini-1.5-flash')
-    except:
+    except Exception as e:
+        st.error(f"Error de configuración: {e}")
         return None
 
 model = conectar_ia()
 
-st.set_page_config(page_title="Public Go Elite", layout="wide")
+st.set_page_config(page_title="Public Go Elite v74", layout="wide")
 
-# --- ESTILOS (Tu diseño azul) ---
+# --- ESTILOS VISUALES CORPORATIVOS ---
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
     [data-testid="stSidebar"] { background-color: #003b5c !important; }
     [data-testid="stSidebar"] * { color: #ffffff !important; }
-    .cat-header { background-color: #003b5c; color: white; padding: 10px; border-radius: 5px; font-weight: bold; margin-top: 20px; }
-    .news-item { border-bottom: 1px solid #f0f0f0; padding: 10px 0; }
-    .news-link { color: #003b5c; text-decoration: none; font-weight: bold; font-size: 1rem; }
-    .risk-box { border-left: 8px solid #003b5c; background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin-top: 10px; }
+    .cat-header { background-color: #003b5c; color: white; padding: 10px; border-radius: 5px; font-weight: bold; margin-top: 25px; text-transform: uppercase; }
+    .risk-high { border-left: 8px solid #d9534f; background-color: #fff5f5; padding: 15px; border-radius: 5px; }
+    .risk-med { border-left: 8px solid #f0ad4e; background-color: #fff9f0; padding: 15px; border-radius: 5px; }
+    .news-item { border-bottom: 1px solid #f0f0f0; padding: 12px 0; }
+    .news-link { color: #003b5c; text-decoration: none; font-weight: 500; font-size: 1.05rem; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- MOTOR DE BÚSQUEDA (Reforzado) ---
-def buscar_noticias(query, periodo):
-    # Simplificamos la query para asegurar que traiga resultados
+# --- CAPA DE INTELIGENCIA DE RIESGO ---
+def generar_analisis_riesgo(cat, data, alcance):
+    titulares = "".join([f"[{i}] {n['titulo'].split(' - ')[0]} " for i, n in enumerate(data, 1)])
+    prompt = f"""
+    Actúa como Directora de Riesgo de Public Go. 
+    Analiza estos hechos en Venezuela ({alcance}): {titulares}
+    Estructura tu respuesta así:
+    1. NIVEL DE RIESGO: (Bajo/Medio/Alto)
+    2. ANÁLISIS: Breve impacto en el clima de negocios.
+    3. RECOMENDACIÓN: Acción inmediata para clientes corporativos.
+    Usa [n] para referencias. Sin saludos.
+    """
+    try:
+        res = model.generate_content(prompt)
+        return res.text.strip()
+    except Exception as e:
+        return f"⚠️ Error de conexión: {str(e)}"
+
+@st.cache_data(ttl=600)
+def buscar_rss(query, periodo):
     url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}+when:{periodo}&hl=es-419&gl=VE&ceid=VE:es-419"
     results = []
     try:
-        r = requests.get(url, timeout=10)
+        r = requests.get(url, timeout=12)
         soup = BeautifulSoup(r.text, 'xml')
-        for item in soup.find_all('item')[:5]:
-            results.append({"titulo": item.title.get_text().split(" - ")[0], "link": item.link.get_text()})
-    except:
-        pass
+        for item in soup.find_all('item')[:7]:
+            results.append({"titulo": item.title.get_text(), "link": item.link.get_text()})
+    except: pass
     return results
 
-# --- SIDEBAR ---
+# --- SIDEBAR & CÁLCULOS ---
 with st.sidebar:
     st.title("🛡️ Public Go")
     alcance = st.radio("Filtro:", ["Hoy", "Semana", "Mes"])
-    codigos = {"Hoy": "1d", "Semana": "7d", "Mes": "30d"}
     st.divider()
-    st.metric("Tasa BCV", "417.35 Bs", "+0.79%")
+    st.metric("Tasa BCV", "417.35 Bs", "+0.79%") 
+    st.metric("EMBI (Riesgo País)", "18,450 bps", "-50 bps", delta_color="inverse")
 
 # --- CUERPO PRINCIPAL ---
 st.title("🛡️ Strategic Insight Dashboard")
+st.subheader("Monitoreo de Riesgo Político y Económico")
 
 CATEGORIAS = {
-    "🏛️ GOBIERNO & PODER": 'Venezuela (Delcy OR Fiscalía OR Diosdado OR Nombramiento OR renuncia OR Ministro)',
-    "🛢️ ENERGÍA & LICENCIAS": 'Venezuela (Chevron OR Shell OR PDVSA OR Licencia)',
-    "💰 ECONOMÍA & CONSUMO": 'Venezuela (BCV OR dólar OR inflación)'
+    "🏛️ GOBIERNO & PODER": 'Venezuela (Delcy OR Diosdado OR nombramiento OR renuncia OR Fiscal OR Asamblea Nacional)',
+    "🛢️ ENERGÍA & LICENCIAS": 'Venezuela (Shell OR Chevron OR PDVSA OR Licencia OR sanciones)',
+    "💰 ECONOMÍA & CONSUMO": 'Venezuela (bcv OR dólar OR inflación OR inversión OR canasta)',
+    "🌎 RELACIONES EXTERNAS": 'Venezuela (Trump OR Marco Rubio OR Washington OR diplomacia)'
 }
+codigos = {"Hoy": "1d", "Semana": "7d", "Mes": "30d"}
 
-if st.button("🚀 GENERAR REPORTE"):
-    st.session_state['run'] = True
+if st.button("🚀 GENERAR REPORTE DE INTELIGENCIA"):
+    st.session_state['ver'] = True
 
-if st.session_state.get('run'):
+if st.session_state.get('ver'):
     for cat, q in CATEGORIAS.items():
         st.markdown(f"<div class='cat-header'>{cat}</div>", unsafe_allow_html=True)
-        noticias = buscar_noticias(q, codigos[alcance])
+        noticias = buscar_rss(q, codigos[alcance])
         
         if noticias:
-            col1, col2 = st.columns([1.5, 1.5])
-            with col1:
-                st.write("**📌 Noticias Detectadas**")
-                titulares_texto = ""
-                for n in noticias:
-                    st.markdown(f"<div class='news-item'><a href='{n['link']}' target='_blank' class='news-link'>{n['titulo']}</a></div>", unsafe_allow_html=True)
-                    titulares_texto += f"- {n['titulo']}\n"
-            
-            with col2:
+            c1, c2 = st.columns([1.8, 1.2])
+            with c1:
+                st.write("**📌 Eventos Detectados**")
+                for j, n in enumerate(noticias, 1):
+                    st.markdown(f"<div class='news-item'>[{j}] <a href='{n['link']}' target='_blank' class='news-link'>{n['titulo'].split(' - ')[0]}</a></div>", unsafe_allow_html=True)
+            with c2:
                 st.write("**🧠 Análisis de Riesgo**")
-                # El análisis solo ocurre si presionas el botón de esa categoría
-               with col2:
-                st.write("**🧠 Análisis de Riesgo**")
-                # El análisis solo ocurre si presionas el botón de esa categoría
-                if st.button(f"Analizar {cat}", key=cat):
-                    if model:
-                        with st.spinner("IA analizando..."):
-                            try:
-                                prompt = f"Analiza el riesgo político y económico de estos titulares en Venezuela: {titulares_texto}. Responde en 3 puntos breves."
-                                res = model.generate_content(prompt)
-                                st.markdown(f"<div class='risk-box'>{res.text}</div>", unsafe_allow_html=True)
-                            except Exception as e:
-                                st.error(f"Error de IA: {e}")
-                    else:
-                        st.warning("IA no conectada. Revisa tu API Key en Secrets.")
+                if st.button(f"🔍 Evaluar Riesgo {cat}", key=cat):
+                    with st.spinner("Calculando impacto..."):
+                        analisis = generar_analisis_riesgo(cat, noticias, alcance)
+                        clase = "risk-high" if "ALTO" in analisis.upper() else "risk-med"
+                        st.markdown(f"<div class='{clase}'>{analisis}</div>", unsafe_allow_html=True)
+
+st.divider()
+st.caption(f"Public Go Elite v74.0 | Corte: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
