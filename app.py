@@ -82,4 +82,17 @@ if st.session_state.get('run'):
             with col2:
                 st.write("**🧠 Análisis de Riesgo**")
                 # El análisis solo ocurre si presionas el botón de esa categoría
-                if st.button(f"Analizar {
+               with col2:
+                st.write("**🧠 Análisis de Riesgo**")
+                # El análisis solo ocurre si presionas el botón de esa categoría
+                if st.button(f"Analizar {cat}", key=cat):
+                    if model:
+                        with st.spinner("IA analizando..."):
+                            try:
+                                prompt = f"Analiza el riesgo político y económico de estos titulares en Venezuela: {titulares_texto}. Responde en 3 puntos breves."
+                                res = model.generate_content(prompt)
+                                st.markdown(f"<div class='risk-box'>{res.text}</div>", unsafe_allow_html=True)
+                            except Exception as e:
+                                st.error(f"Error de IA: {e}")
+                    else:
+                        st.warning("IA no conectada. Revisa tu API Key en Secrets.")
