@@ -81,10 +81,10 @@ st.title("🛡️ Public Go: AI Strategic Hub")
 st.write(f"Corte Informativo: **{datetime.now().strftime('%d/%m/%Y')}**")
 
 CATEGORIAS = {
-    "🏛️ GOBIERNO": 'Venezuela política instituciones estado',
-    "🛢️ ENERGÍA": 'Venezuela crudo petróleo gas licencias PDVSA',
-    "💰 ECONOMÍA": 'Venezuela finanzas PIB inversión mercado',
-    "🌎 RELACIONES": 'Venezuela geopolítica diplomacia sanciones Washington'
+    "🏛️ GOBIERNO": 'Venezuela (Delcy OR Diosdado OR Larry Devoe OR Tarek William Saab)',
+    "🛢️ ENERGÍA": 'Venezuela (Shell OR Chevron OR PDVSA OR gas OR Licencia)',
+    "💰 ECONOMÍA": 'Venezuela (bcv OR dólar OR tasa OR pib OR crecimiento OR inversión)',
+    "🌎 RELACIONES": 'Venezuela (Trump OR Marco Rubio OR Washington OR sanciones)'
 }
 
 codigos = {"Hoy": "1d", "Semana": "7d", "Mes": "30d"}
