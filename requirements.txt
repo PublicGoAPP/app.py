@@ -1,8 +1,4 @@
 streamlit
+google-generativeai
 requests
 beautifulsoup4
-newspaper3k
-google-generativeai
-lxml_html_clean
-pandas
-yfinance
