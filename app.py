@@ -5,32 +5,27 @@ import pandas as pd
 import google.generativeai as genai
 from datetime import datetime
 import re
-import time  # <--- IMPORTANTE: Necesario para la pausa entre peticiones
+import time 
 
-# --- CONFIGURACIÓN DE IA (OMNI-CONEXIÓN v53 BASE) ---
+# --- CONFIGURACIÓN DE IA ---
 def conectar_ia_robusta():
     if "GOOGLE_API_KEY" not in st.secrets:
         st.error("❌ Falta la clave en los Secrets de Streamlit.")
         return None
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     try:
-        modelos_validos = []
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                modelos_validos.append(m.name)
+        modelos_validos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         prioridad = ['models/gemini-1.5-flash', 'models/gemini-1.5-pro', 'models/gemini-pro']
         for p in prioridad:
-            if p in modelos_validos:
-                return genai.GenerativeModel(p)
+            if p in modelos_validos: return genai.GenerativeModel(p)
         return genai.GenerativeModel(modelos_validos[0]) if modelos_validos else None
-    except:
-        return genai.GenerativeModel('gemini-pro')
+    except: return genai.GenerativeModel('gemini-pro')
 
 model = conectar_ia_robusta()
 
-st.set_page_config(page_title="Public Go Elite v55.6", layout="wide")
+st.set_page_config(page_title="Public Go Elite v55.8", layout="wide")
 
-# --- ESTILOS VISUALES REFINADOS ---
+# --- ESTILOS ---
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
@@ -44,37 +39,32 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNCIONES ESTRATÉGICAS ---
+# --- FUNCIONES ---
 def generar_analisis_inteligente(cat, data, alcance):
-    if not model: return "Error de conexión con el motor de IA."
+    if not model: return "Error de conexión."
+    titulares_numerados = "".join([f"[{i}] {n['titulo'].split(' - ')[0]} " for i, n in enumerate(data, 1)])
     
-    # Creamos una lista numerada para que la IA pueda referenciar
-    titulares_numerados = ""
-    for i, n in enumerate(data, 1):
-        titulares_numerados += f"[{i}] {n['titulo'].split(' - ')[0]} "
-
     prompt = f"""
-    Eres la Directora de Estrategia de Public Go. Analiza estos hechos de {cat} en Venezuela ({alcance}) para hoy 27 de febrero 2026: {titulares_numerados}. 
-    
-    INSTRUCCIONES CRÍTICAS:
-    1. PROHIBIDO: No uses introducciones, ni saludos, ni frases amables.
-    2. REFERENCIAS: Cada vez que menciones un hecho o hagas una afirmación, DEBES incluir el número de la fuente entre corchetes, ej: [1] o [1, 3].
-    3. ESTRUCTURA: Ve directo al grano. Identifica la tendencia y el impacto. 
-    4. CUANTITATIVO: Solo si hay cifras relevantes en los titulares, analízalas.
-    5. Recomendación estratégica final sin preámbulos.
+    Eres la Directora de Estrategia de Public Go. Analiza: {cat} en Venezuela ({alcance}) para hoy 27 de febrero 2026: {titulares_numerados}. 
+    INSTRUCCIONES:
+    1. PROHIBIDO: Introducciones, saludos o frases amables. 
+    2. REFERENCIAS: Usa [n] para sustentar cada afirmación.
+    3. ESTILO: Directo, tipo informe de inteligencia.
+    4. CUANTITATIVO: Solo si hay cifras.
+    5. RECOMENDACIÓN: Una frase final.
     """
     try:
-        # Limpiamos posibles introducciones que la IA genere por inercia
+        # Añadimos un pequeño retardo interno también para asegurar estabilidad
         respuesta = model.generate_content(prompt).text
-        # Filtro extra de seguridad por si la IA ignora el prompt
-        frases_a_borrar = ["Estimados colegas", "Como Directora", "análisis profundo", "Diagnóstico Cualitativo Profundo"]
-        for frase in frases_a_borrar:
+        for frase in ["Estimados", "Como Directora", "He realizado", "Diagnóstico"]:
             respuesta = respuesta.replace(frase, "")
         return respuesta.strip()
     except Exception as e:
-        return f"⚠️ Unidad de inteligencia saturada. Reintentando... ({str(e)[:30]})"
+        if "429" in str(e):
+            return "⚠️ El servidor de Google está procesando muchas solicitudes. Por favor, espere 10 segundos y vuelva a presionar el botón de Análisis."
+        return f"⚠️ Error en unidad de inteligencia: {str(e)[:30]}"
 
-def buscar_rss_profundo(query, periodo_cod):
+def buscar_rss(query, periodo_cod):
     url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}+when:{periodo_cod}&hl=es-419&gl=VE&ceid=VE:es-419"
     results = []
     try:
@@ -108,33 +98,24 @@ codigos = {"Hoy": "1d", "Semana": "7d", "Mes": "30d"}
 if st.button("🚀 ANÁLISIS INFORMATIVO E INTELIGENCIA"):
     for cat, q in CATEGORIAS.items():
         st.markdown(f"<div class='cat-header'>{cat}</div>", unsafe_allow_html=True)
-        noticias = buscar_rss_profundo(q, codigos[alcance])
+        noticias = buscar_rss(q, codigos[alcance])
         
         if noticias:
             col_news, col_diag = st.columns([2, 1.2])
-            
             with col_news:
                 st.write("**📌 Noticias Recientes**")
                 for i, n in enumerate(noticias, 1):
-                    st.markdown(f"""
-                        <div class='news-item'>
-                            <span class='ref-tag'>[{i}]</span>
-                            <a href='{n['link']}' target='_blank' class='news-link'>
-                                {n['titulo'].split(' - ')[0]}
-                            </a>
-                        </div>
-                    """, unsafe_allow_html=True)
+                    st.markdown(f"<div class='news-item'><span class='ref-tag'>[{i}]</span><a href='{n['link']}' target='_blank' class='news-link'>{n['titulo'].split(' - ')[0]}</a></div>", unsafe_allow_html=True)
             
             with col_diag:
                 st.write("**🧠 Análisis de Inteligencia**")
-                # Llamada a la IA con pequeña pausa para evitar errores de cuota (429)
                 analisis = generar_analisis_inteligente(cat, noticias, alcance)
                 st.markdown(f"<div class='analysis-box'>{analisis}</div>", unsafe_allow_html=True)
             
-            # PAUSA ESTRATÉGICA: 2.5 segundos para que la API respire entre categorías
-            time.sleep(2.5) 
+            # PAUSA EXTENDIDA: 4 segundos para evitar el error 429
+            time.sleep(4.0) 
         else:
-            st.info(f"Sin novedades significativas en el eje de {cat}.")
+            st.info(f"Sin novedades en {cat}.")
 
 st.divider()
 st.caption("Uso exclusivo Public Go Consultores.")
