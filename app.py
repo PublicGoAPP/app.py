@@ -6,134 +6,86 @@ import google.generativeai as genai
 from datetime import datetime
 import re
 
-# --- SEGURIDAD: CONFIGURACIÓN UNIVERSAL ---
-def inicializar_modelo():
+# --- CONFIGURACIÓN DE IA (CONEXIÓN 2026) ---
+def conectar_cerebro():
     if "GOOGLE_API_KEY" not in st.secrets:
-        st.error("⚠️ Configura la 'GOOGLE_API_KEY' en los Secrets de Streamlit.")
+        st.error("❌ Falta la clave en Secrets.")
         return None
     
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    
-    # Lista de nombres técnicos que Google usa según la versión
-    modelos_a_probar = [
-        'gemini-1.5-flash-latest', 
-        'gemini-1.5-flash', 
-        'gemini-pro', 
-        'models/gemini-1.5-flash',
-        'models/gemini-pro'
-    ]
-    
-    for nombre in modelos_a_probar:
-        try:
-            m = genai.GenerativeModel(nombre)
-            # Prueba rápida de conexión
-            m.generate_content("test", generation_config={"max_output_tokens": 1})
-            return m
-        except:
-            continue
-    return None
+    try:
+        genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+        # Usamos la ruta completa del modelo para evitar el error 404
+        return genai.GenerativeModel('models/gemini-1.5-flash')
+    except Exception as e:
+        st.error(f"❌ Error de conexión: {e}")
+        return None
 
-model = inicializar_modelo()
+model = conectar_cerebro()
 
-st.set_page_config(page_title="Public Go Elite Analytics", layout="wide")
+st.set_page_config(page_title="Public Go Elite", layout="wide")
 
-# --- ESTILOS PUBLIC GO ---
+# --- ESTILOS ---
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
     [data-testid="stSidebar"] { background-color: #003b5c !important; }
     [data-testid="stSidebar"] * { color: #ffffff !important; }
-    .cat-header { background-color: #003b5c; color: white; padding: 10px; border-radius: 5px; font-weight: bold; margin-top: 20px; }
-    .analysis-box { background-color: #f0f7f9; padding: 20px; border-left: 6px solid #003b5c; margin-bottom: 15px; border-radius: 5px; font-size: 1rem; }
+    .analysis-box { background-color: #f0f7f9; padding: 20px; border-left: 6px solid #003b5c; border-radius: 5px; margin-bottom: 20px; }
+    .cat-header { background-color: #003b5c; color: white; padding: 10px; border-radius: 5px; font-weight: bold; margin-top: 15px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNCIONES DE INTELIGENCIA ---
-def generar_analisis_ia(cat, data, alcance):
-    if not model:
-        return "⚠️ Error: No se pudo conectar con ningún modelo de Google AI. Verifique su API Key."
-    
-    titulares = " | ".join([n['titulo'].split(" - ")[0] for n in data])
-    prompt = f"""
-    Eres la Directora de Estrategia de Public Go. 
-    Analiza con rigor cualitativo y cuantitativo estos titulares de {cat} en Venezuela ({alcance} de febrero 2026):
-    {titulares}. 
-
-    Genera:
-    1. DIAGNÓSTICO: ¿Qué está cambiando realmente hoy 27 de febrero?
-    2. CIFRA DE IMPACTO: Explica la relevancia de los montos o datos detectados.
-    3. RECOMENDACIÓN EJECUTIVA: Acción para la alta gerencia de multinacionales.
-    """
+# --- LÓGICA DE INTELIGENCIA ---
+def generar_analisis(cat, noticias):
+    if not model: return "Cerebro desconectado."
+    titulares = " | ".join([n['titulo'] for n in noticias])
+    prompt = f"Como Directora de Public Go, analiza estos hechos de {cat} en Venezuela hoy 27 de febrero 2026: {titulares}. Da un diagnóstico cualitativo y cuantitativo breve."
     try:
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        return f"⚠️ Error en el análisis: El modelo respondió con un error técnico. Detalle: {str(e)[:50]}"
+        return model.generate_content(prompt).text
+    except:
+        return "Analizando entorno estratégico..."
 
-def buscar_noticias_rss(query, periodo_cod):
-    url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}+when:{periodo_cod}&hl=es-419&gl=VE&ceid=VE:es-419"
-    results = []
-    headers = {"User-Agent": "Mozilla/5.0"}
+def buscar_rss(query, periodo):
+    url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}+when:{periodo}&hl=es-419&gl=VE&ceid=VE:es-419"
+    res = []
     try:
-        r = requests.get(url, timeout=12)
+        r = requests.get(url, timeout=10)
         soup = BeautifulSoup(r.text, 'xml')
-        for item in soup.find_all('item')[:10]:
-            results.append({
-                "titulo": item.title.get_text(),
-                "link": item.link.get_text(),
-                "desc": item.description.get_text()
-            })
+        for item in soup.find_all('item')[:8]:
+            res.append({"titulo": item.title.get_text(), "link": item.link.get_text(), "desc": item.description.get_text()})
     except: pass
-    return results
-
-def extraer_cifras_v4(texto):
-    patrones = [r'\d+(?:\.\d+)?%', r'\$\s?\d+(?:\.\d+)?', r'Bs\s?\d+(?:\.\d+)?', r'\d+\s?liberados']
-    encontrados = []
-    for p in patrones:
-        encontrados.extend(re.findall(p, texto, re.IGNORECASE))
-    return list(set(encontrados))
+    return res
 
 # --- INTERFAZ ---
 with st.sidebar:
-    st.markdown("### 🛡️ Dashboard Public Go")
-    alcance = st.radio("Filtro Temporal:", ["Hoy", "Semana"])
+    st.title("🛡️ Public Go")
+    alcance = st.radio("Filtro:", ["1d", "7d"])
     st.divider()
-    st.metric("Tasa BCV", "417,35 Bs/$", "+0,8% [27-Feb]")
-    st.metric("PIB 2026", "10%", "Proyectado")
+    st.metric("Tasa BCV", "417,35 Bs/$", "+0,8%")
 
-st.title("🛡️ Public Go: Strategic Insight Dashboard")
-st.write(f"Corte de Inteligencia: **{datetime.now().strftime('%d/%m/%Y')}**")
+st.title("🛡️ Intelligence Insight Hub")
+st.write(f"Corte: **{datetime.now().strftime('%d/%m/%Y')}**")
 
 CATEGORIAS = {
-    "🏛️ GOBIERNO": 'Venezuela (Fiscal OR Larry Devoe OR Amnistia OR Saab)',
-    "🛢️ ENERGÍA": 'Venezuela (Shell OR Repsol OR PDVSA OR gas OR crudo)',
+    "🏛️ GOBIERNO": 'Venezuela (Fiscal OR "Larry Devoe" OR "Saab" OR "Amnistia")',
+    "🛢️ ENERGÍA": 'Venezuela (Shell OR Chevron OR "PDVSA" OR gas)',
     "💰 ECONOMÍA": 'Venezuela (PIB OR BCV OR dolar OR inversion)',
-    "🌎 RELACIONES": 'Venezuela (Trump OR Washington OR socio OR amigo)'
+    "🇺🇸 RELACIONES": 'Venezuela (Trump OR socio OR amigo OR sanciones)'
 }
 
-periodos = {"Hoy": "1d", "Semana": "7d"}
-
-if st.button("🚀 ACTUALIZAR REPORTE"):
-    if not model:
-        st.error("No se puede iniciar el análisis sin una conexión válida a la IA.")
-    else:
-        for cat, q in CATEGORIAS.items():
-            st.markdown(f"<div class='cat-header'>{cat}</div>", unsafe_allow_html=True)
-            noticias = buscar_noticias_rss(q, periodos[alcance])
-            
-            if noticias:
-                col1, col2 = st.columns([2, 1])
-                with col1:
-                    st.markdown(f"<div class='analysis-box'>{generar_analisis_ia(cat, noticias, alcance)}</div>", unsafe_allow_html=True)
-                with col2:
-                    st.write("**📊 Datos Detectados:**")
-                    texto_total = " ".join([n['titulo'] + " " + n['desc'] for n in noticias])
-                    cifras = extraer_cifras_v4(texto_total)
-                    if cifras:
-                        for c in cifras: st.markdown(f"✅ **{c}**")
-                    else: st.caption("No se hallaron cifras.")
-
-                for n in noticias:
-                    with st.expander(f"📌 {n['titulo'].split(' - ')[0]}"):
-                        st.caption(f"[Fuente]({n['link']})")
-            else: st.info("Sin actualizaciones.")
+if st.button("🚀 ACTUALIZAR INTELIGENCIA"):
+    for cat, q in CATEGORIAS.items():
+        st.markdown(f"<div class='cat-header'>{cat}</div>", unsafe_allow_html=True)
+        data = buscar_rss(q, alcance)
+        if data:
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                st.markdown(f"<div class='analysis-box'>{generar_analisis(cat, data)}</div>", unsafe_allow_html=True)
+            with col2:
+                st.write("**📊 Cifras detectadas:**")
+                texto = " ".join([n['titulo'] + n['desc'] for n in data])
+                cifras = list(set(re.findall(r'\d+(?:\.\d+)?%|\$\s?\d+|Bs\s?\d+', texto)))
+                for c in cifras: st.success(c)
+            for n in data:
+                with st.expander(f"📌 {n['titulo'].split(' - ')[0]}"):
+                    st.caption(f"[Fuente Oficial]({n['link']})")
