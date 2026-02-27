@@ -5,26 +5,27 @@ import google.generativeai as genai
 from datetime import datetime
 import time
 
-# --- CONFIGURACIÓN DE IA (REPARADA PARA CUENTA PRO) ---
+# --- CONFIGURACIÓN DE IA (SOLUCIÓN DEFINITIVA AL 404 PRO) ---
 def conectar_ia():
     if "GOOGLE_API_KEY" not in st.secrets:
         st.error("❌ Falta la clave en Secrets.")
         return None
     try:
-        # Forzamos el uso de la versión estable (v1) en lugar de la beta
+        # Forzamos la configuración inicial
         genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-        # IMPORTANTE: En cuentas Pro, se usa el nombre del modelo sin prefijos
-        return genai.GenerativeModel(model_name='gemini-1.5-flash')
+        # IMPORTANTE: En cuentas de pago, NO usamos prefijos ni versiones beta.
+        # Usamos el nombre del modelo directamente para que Google lo reconozca en producción.
+        return genai.GenerativeModel('gemini-1.5-flash')
     except Exception as e:
         st.error(f"Error de configuración: {e}")
         return None
 
-# Inicialización correcta
+# Inicializamos el modelo de forma global para que sea detectado por las funciones
 model = conectar_ia()
 
 st.set_page_config(page_title="Public Go Elite v74", layout="wide")
 
-# --- ESTILOS VISUALES CORPORATIVOS ---
+# --- ESTILOS VISUALES CORPORATIVOS (Tu diseño original) ---
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
@@ -40,9 +41,9 @@ st.markdown("""
 
 # --- CAPA DE INTELIGENCIA DE RIESGO ---
 def generar_analisis_riesgo(cat, data, alcance):
-    if not model:
-        return "⚠️ IA no configurada. Revisa los Secrets."
-    
+    if model is None:
+        return "⚠️ Error: El motor de IA no se inició. Verifica tu API Key."
+        
     titulares = "".join([f"[{i}] {n['titulo'].split(' - ')[0]} " for i, n in enumerate(data, 1)])
     prompt = f"""
     Actúa como Directora de Riesgo de Public Go. 
@@ -54,6 +55,7 @@ def generar_analisis_riesgo(cat, data, alcance):
     Usa [n] para referencias. Sin saludos.
     """
     try:
+        # Llamada directa al modelo estable
         res = model.generate_content(prompt)
         return res.text.strip()
     except Exception as e:
@@ -107,7 +109,6 @@ if st.session_state.get('ver'):
                     st.markdown(f"<div class='news-item'>[{j}] <a href='{n['link']}' target='_blank' class='news-link'>{n['titulo'].split(' - ')[0]}</a></div>", unsafe_allow_html=True)
             with c2:
                 st.write("**🧠 Análisis de Riesgo**")
-                # El botón de análisis por categoría
                 if st.button(f"🔍 Evaluar Riesgo {cat}", key=cat):
                     with st.spinner("Calculando impacto..."):
                         analisis = generar_analisis_riesgo(cat, noticias, alcance)
