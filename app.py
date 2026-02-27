@@ -8,16 +8,14 @@ import time
 # --- CONFIGURACIÓN DE IA (SOLUCIÓN DEFINITIVA AL 404 PRO) ---
 def conectar_ia():
     if "GOOGLE_API_KEY" not in st.secrets:
-        st.error("❌ Falta la clave en Secrets.")
         return None
     try:
-        # Forzamos la configuración inicial
-        genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-        # IMPORTANTE: En cuentas de pago, NO usamos prefijos ni versiones beta.
-        # Usamos el nombre del modelo directamente para que Google lo reconozca en producción.
+        # Forzamos a la librería a usar la versión estable 'v1'
+        genai.configure(api_key=st.secrets["GOOGLE_API_KEY"], transport='rest')
+        # Llamamos al modelo sin el prefijo 'models/'
         return genai.GenerativeModel('gemini-1.5-flash')
     except Exception as e:
-        st.error(f"Error de configuración: {e}")
+        st.error(f"Error: {e}")
         return None
 
 # Inicializamos el modelo de forma global para que sea detectado por las funciones
