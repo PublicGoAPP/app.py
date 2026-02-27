@@ -3,18 +3,18 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 import google.generativeai as genai
-from datetime import datetime, timedelta
+from datetime import datetime
 
-# --- CONFIGURACIÓN SEGURA ---
+# --- CONFIGURACIÓN DE SEGURIDAD ---
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     model = genai.GenerativeModel('gemini-1.5-flash')
 except:
     st.error("Error: Configure su API Key en los Secrets de Streamlit.")
 
-st.set_page_config(page_title="Public Go OSINT", layout="wide")
+st.set_page_config(page_title="Public Go Elite", layout="wide")
 
-# --- DISEÑO ELITE ---
+# --- DISEÑO CORPORATIVO ---
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
@@ -25,69 +25,61 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- MOTOR DE BÚSQUEDA POR INTERVALO ---
-def buscar_osint(query, f_inicio, f_fin):
-    # Formateamos las fechas para Google: MM/DD/YYYY
-    d1 = f_inicio.strftime('%m/%d/%Y')
-    d2 = f_fin.strftime('%m/%d/%Y')
-    
-    # El secreto: tbs=cdr:1,cd_min:...,cd_max:...
-    url = f"https://www.google.com/search?q={query.replace(' ', '+')}&tbm=nws&tbs=cdr:1,cd_min:{d1},cd_max:{d2}"
+# --- MOTOR DE BÚSQUEDA RSS (MÁS ESTABLE) ---
+def buscar_noticias_rss(query, periodo_cod):
+    # periodo_cod puede ser 'd' (día), 'w' (semana), 'm' (mes)
+    url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}+when:{periodo_cod}&hl=es-419&gl=VE&ceid=VE:es-419"
     
     results = []
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
-        r = requests.get(url, headers=headers, timeout=12)
-        soup = BeautifulSoup(r.text, 'html.parser')
-        # Buscamos los contenedores de noticias de Google
-        for g in soup.find_all('div', class_='So007e')[:8]:
-            link = g.find('a')['href']
-            title = g.find('div', role='heading').get_text()
-            results.append({"titulo": title, "link": link})
+        r = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(r.text, 'xml')
+        for item in soup.find_all('item')[:10]:
+            results.append({
+                "titulo": item.title.get_text(),
+                "link": item.link.get_text(),
+                "fecha": item.pubDate.get_text()
+            })
     except: pass
     return results
 
 # --- INTERFAZ ---
 with st.sidebar:
-    st.markdown("### 📅 Filtro Temporal OSINT")
-    tipo_busqueda = st.radio("Método de búsqueda:", ["Rangos Predefinidos", "Intervalo Personalizado"])
-    
-    if tipo_busqueda == "Intervalo Personalizado":
-        fecha_inicio = st.date_input("Desde:", datetime(2026, 2, 1))
-        fecha_fin = st.date_input("Hasta:", datetime.now())
-    else:
-        alcance = st.radio("Alcance:", ["Hoy", "Semana"])
-        fecha_fin = datetime.now()
-        fecha_inicio = fecha_fin - timedelta(days=1 if alcance == "Hoy" else 7)
-
+    st.markdown("### 🛡️ Radar Public Go")
+    alcance = st.radio("Alcance Temporal:", ["Hoy", "Semana", "Mes"])
     st.divider()
     st.metric("PIB 2026 (Est.)", "10%", "+2.5%")
+    st.metric("Riesgo País", "Moderado", "Estable")
 
-st.markdown("<h1 style='color: #003b5c;'>🛡️ Public Go: OSINT Intelligence</h1>", unsafe_allow_html=True)
-st.write(f"Analizando desde el **{fecha_inicio.strftime('%d/%b')}** hasta el **{fecha_fin.strftime('%d/%b')}**")
+st.markdown("<h1 style='color: #003b5c;'>Public Go: Intelligence Insight Hub</h1>", unsafe_allow_html=True)
+st.write(f"Análisis generado el: **{datetime.now().strftime('%d/%m/%Y')}**")
 
 CATEGORIAS = {
-    "🏛️ GOBIERNO": 'Venezuela (Fiscal OR "Larry Devoe" OR "Saab" OR "Amnistia")',
+    "🏛️ GOBIERNO": 'Venezuela (Fiscal OR "Larry Devoe" OR "Amnistia" OR "Saab")',
     "🛢️ ENERGÍA": 'Venezuela (Shell OR Chevron OR "PDVSA" OR "gas" OR "crudo")',
     "💰 ECONOMÍA": 'Venezuela (PIB OR "BCV" OR "dolar" OR "inversion")',
-    "🇺🇸 RELACIONES": 'Venezuela (Trump OR "Casa Blanca" OR "Sanciones")'
+    "🇺🇸 RELACIONES": 'Venezuela (Trump OR "Washington" OR "Sanciones")'
 }
 
-if st.button("🚀 INICIAR ESCANEO PROFUNDO"):
+codigos = {"Hoy": "1d", "Semana": "7d", "Mes": "30d"}
+
+if st.button("🚀 ACTUALIZAR INTELIGENCIA"):
     for cat, q in CATEGORIAS.items():
         st.markdown(f"<div class='cat-header'>{cat}</div>", unsafe_allow_html=True)
-        noticias = buscar_osint(q, fecha_inicio, fecha_fin)
+        noticias = buscar_noticias_rss(q, codigos[alcance])
         
         if noticias:
             titulares = " | ".join([n['titulo'] for n in noticias])
-            # La IA ahora sabe exactamente qué fechas está analizando
-            prompt = f"Analiza estos eventos de {cat} ocurridos entre el {fecha_inicio} y el {fecha_fin} en Venezuela. Da 3 conclusiones estratégicas."
+            prompt = f"Eres consultora de Public Go. Analiza estos hechos de {cat} en Venezuela para el periodo {alcance}: {titulares}. Da 3 conclusiones estratégicas para el 27 de febrero de 2026."
+            
             try:
                 analisis = model.generate_content(prompt).text
                 st.markdown(f"<div class='analysis-box'>{analisis}</div>", unsafe_allow_html=True)
-            except: st.info("Análisis en proceso...")
+            except: 
+                st.info("Analizando tendencias del sector...")
 
             for n in noticias:
                 st.markdown(f"📌 **{n['titulo']}** ([Fuente]({n['link']}))")
         else:
-            st.markdown("<div class='analysis-box'>No se hallaron registros en este intervalo.</div>", unsafe_allow_html=True)
+            st.markdown("<div class='analysis-box'>No se detectaron hitos críticos en este eje.</div>", unsafe_allow_html=True)
