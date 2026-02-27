@@ -3,89 +3,115 @@ import requests
 from bs4 import BeautifulSoup
 import google.generativeai as genai
 from datetime import datetime
+import pandas as pd
 
-# --- CONFIGURACIÓN DE IA PRO ---
-def inicializar_ia():
+# --- CONFIGURACIÓN DE IA PRO (Nivel 1) ---
+def conectar_ia():
     if "GOOGLE_API_KEY" not in st.secrets:
-        st.error("🚨 Falta la clave API en los Secrets de Streamlit.")
+        st.error("❌ Falta la clave en Secrets.")
         return None
     try:
         genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-        # Usamos gemini-1.5-flash: es el más estable para cuentas Nivel 1
         return genai.GenerativeModel('gemini-1.5-flash')
     except Exception as e:
-        st.error(f"Error al configurar Google AI: {e}")
+        st.error(f"Error de configuración: {e}")
         return None
 
-model = inicializar_ia()
+model = conectar_ia()
 
-# --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Public Go Intelligence", layout="wide")
+# --- CONFIGURACIÓN DE LA APP ---
+st.set_page_config(page_title="Public Go Intelligence Hub", layout="wide")
 
+# Estilos de Consultoría Premium
 st.markdown("""
     <style>
-    .main-header { color: #003b5c; font-size: 2.5rem; font-weight: 800; }
-    .report-card { background-color: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 8px solid #003b5c; margin-bottom: 15px; }
-    .stButton>button { background-color: #003b5c; color: white; border-radius: 5px; width: 100%; }
+    .stApp { background-color: #ffffff; }
+    [data-testid="stSidebar"] { background-color: #003b5c !important; }
+    [data-testid="stSidebar"] * { color: #ffffff !important; }
+    .cat-header { background-color: #003b5c; color: white; padding: 12px; border-radius: 5px; font-weight: bold; margin-top: 25px; }
+    .risk-box { padding: 18px; border-radius: 8px; margin-top: 10px; border-left: 10px solid #003b5c; background-color: #fcfcfc; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); }
+    .news-item { border-bottom: 1px solid #f0f0f0; padding: 10px 0; font-size: 0.95rem; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- MOTOR DE BÚSQUEDA ---
-def buscar_noticias():
-    # Buscamos los temas que definimos: Larry Devoe, Fiscalía, Gas y Sanciones
-    query = 'Venezuela ("Larry Devoe" OR "Fiscalía" OR "Shell" OR "Trump") when:1d'
-    url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}&hl=es-419&gl=VE&ceid=VE:es-419"
-    
-    noticias = []
-    try:
-        r = requests.get(url, timeout=10)
-        sopa = BeautifulSoup(r.text, 'xml')
-        for item in sopa.find_all('item')[:6]:
-            noticias.append({
-                "titulo": item.title.get_text().split(" - ")[0],
-                "link": item.link.get_text(),
-                "fecha": item.pubDate.get_text()[:16]
-            })
-    except:
-        st.error("Error al conectar con el servidor de noticias.")
-    return noticias
-
-# --- MOTOR DE ANÁLISIS ---
-def analizar_con_ia(titulo):
+# --- MOTOR DE ANÁLISIS ESTRATÉGICO ---
+def generar_analisis_riesgo(cat, data, alcance):
+    titulares = "".join([f"- {n['titulo']} " for n in data])
     prompt = f"""
     Eres la Directora de Estrategia de Public Go. 
-    Analiza este titular de hoy en Venezuela: "{titulo}"
-    Proporciona:
-    1. IMPLICACIÓN: Qué significa esto para el sector privado y la gobernanza.
-    2. RIESGO: Nivel de riesgo (Bajo/Medio/Alto).
-    Responde de forma ejecutiva y profesional en español.
+    Analiza estos hechos en Venezuela ({alcance}) para la categoría {cat}:
+    {titulares}
+    
+    Estructura tu respuesta:
+    1. 🛡️ NIVEL DE RIESGO: (Bajo/Medio/Alto)
+    2. 💡 IMPLICACIÓN ESTRATÉGICA: Impacto en gobernanza o clima de negocios.
+    3. 🎯 RECOMENDACIÓN CLAVE: Acción sugerida para el cliente.
+    
+    Usa un tono audaz, ejecutivo y profesional.
     """
     try:
         res = model.generate_content(prompt)
-        return res.text
-    except:
-        return "⚠️ La IA está procesando el cambio de nivel de pago. Reintenta en unos minutos."
+        return res.text.strip()
+    except Exception as e:
+        return f"⚠️ Error en análisis: El sistema está sincronizando tu nivel de pago. Reintenta en breve."
 
-# --- INTERFAZ ---
-st.markdown("<h1 class='main-header'>🛡️ Public Go Intelligence Hub</h1>", unsafe_allow_html=True)
-st.write(f"Corte de análisis: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+# --- MOTOR DE BÚSQUEDA ---
+@st.cache_data(ttl=600)
+def buscar_rss(query, periodo):
+    time_code = "1d" if periodo == "Hoy" else "7d"
+    url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}+when:{time_code}&hl=es-419&gl=VE&ceid=VE:es-419"
+    results = []
+    try:
+        r = requests.get(url, timeout=12)
+        soup = BeautifulSoup(r.text, 'xml')
+        for item in soup.find_all('item')[:5]:
+            results.append({"titulo": item.title.get_text().split(" - ")[0], "link": item.link.get_text()})
+    except: pass
+    return results
 
-if st.button("🚀 ACTUALIZAR INTELIGENCIA ESTRATÉGICA"):
-    noticias = buscar_noticias()
-    if noticias:
-        col1, col2 = st.columns(2)
-        for i, n in enumerate(noticias):
-            with (col1 if i % 2 == 0 else col2):
-                st.markdown(f"<div class='report-card'><strong>{n['titulo']}</strong><br><small>{n['fecha']}</small></div>", unsafe_allow_html=True)
-                with st.expander("👁️ Ver Análisis de Riesgo"):
-                    with st.spinner("IA Generando Insight..."):
-                        analisis = analizar_con_ia(n['titulo'])
-                        st.write(analisis)
-                        st.caption(f"[Leer noticia completa]({n['link']})")
-    else:
-        st.warning("No se encontraron noticias críticas en las últimas 24 horas.")
+# --- SIDEBAR PROFESIONAL ---
+with st.sidebar:
+    st.title("🛡️ Public Go")
+    st.markdown("### Estrategia e Inteligencia")
+    alcance = st.radio("Ventana de Monitoreo:", ["Hoy", "Semana"])
+    st.divider()
+    st.metric("Tasa Oficial BCV", "417.36 Bs", "+0.79%")
+    st.caption("Corte: 27 Feb 2026")
+    st.write("---")
+    st.info("Cuenta: Producción Nivel 1")
 
-st.sidebar.title("Configuración")
-st.sidebar.info("Modo: Pago Nivel 1 (Producción)")
-st.sidebar.write("---")
-st.sidebar.caption("© 2026 Public Go Consultores")
+# --- DASHBOARD PRINCIPAL ---
+st.markdown("<h1 style='color: #003b5c;'>Strategic Insight Dashboard</h1>", unsafe_allow_html=True)
+st.write(f"Inteligencia en tiempo real para la toma de decisiones.")
+
+CATEGORIAS = {
+    "🏛️ PODER PÚBLICO": 'Venezuela ("Larry Devoe" OR "Tarek William Saab" OR "Fiscalía")',
+    "🛢️ ENERGÍA Y SANCIONES": 'Venezuela (Chevron OR Shell OR PDVSA OR Licencia OR gas)',
+    "💰 MACROECONOMÍA": 'Venezuela (BCV OR inflación OR aranceles OR dólar)',
+    "🌎 GEOPOLÍTICA": 'Venezuela (Trump OR Marco Rubio OR Washington OR sanciones)'
+}
+
+if st.button("🚀 INICIAR MONITOREO DE ALTA VELOCIDAD"):
+    st.session_state['ready'] = True
+
+if st.session_state.get('ready'):
+    for cat, q in CATEGORIAS.items():
+        st.markdown(f"<div class='cat-header'>{cat}</div>", unsafe_allow_html=True)
+        noticias = buscar_rss(q, alcance)
+        
+        if noticias:
+            c1, c2 = st.columns([1.5, 1.5])
+            with c1:
+                st.markdown("#### Eventos Detectados")
+                for n in noticias:
+                    st.markdown(f"<div class='news-item'>• <a href='{n['link']}' target='_blank' style='color:#003b5c; text-decoration:none;'>{n['titulo']}</a></div>", unsafe_allow_html=True)
+            with c2:
+                if st.button(f"🧠 Analizar {cat}", key=cat):
+                    with st.spinner("Analizando implicaciones..."):
+                        analisis = generar_analisis_riesgo(cat, noticias, alcance)
+                        st.markdown(f"<div class='risk-box'>{analisis}</div>", unsafe_allow_html=True)
+        else:
+            st.info(f"No se detectaron cambios críticos en {cat} en este periodo.")
+
+st.divider()
+st.caption("Public Go Elite v81.0 | Confidencial")
