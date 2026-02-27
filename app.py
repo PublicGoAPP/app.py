@@ -96,10 +96,10 @@ st.title("🛡️ Public Go: Strategic Insight Dashboard")
 st.write(f"Corte Informativo: **{datetime.now().strftime('%d/%m/%Y')}**")
 
 CATEGORIAS = {
-    "🏛️ GOBIERNO": 'Venezuela (Fiscal OR Larry Devoe OR Amnistia OR Saab)',
-    "🛢️ ENERGÍA": 'Venezuela (Shell OR Repsol OR PDVSA OR gas)',
-    "💰 ECONOMÍA": 'Venezuela (PIB OR BCV OR dolar OR inversion)',
-    "🌎 RELACIONES": 'Venezuela (Trump OR socio OR amigo OR sanciones)'
+    "🏛️ GOBIERNO": 'Venezuela (Delcy OR Diosdado OR Fiscal General OR ministro OR nombramiento OR renuncia)',
+    "🛢️ ENERGÍA": 'Venezuela (Shell OR Chevron OR Repsol OR petróleo OR gas OR PDVSA OR energía OR Licencia)',
+    "💰 ECONOMÍA": 'Venezuela (bcv OR dólar OR tasa OR pib OR crecimiento OR consumidor OR inversión OR arancel)',
+    "🌎 RELACIONES": 'Venezuela (Trump OR Marco Rubio OR Washintong OR sanciones OR Laura Dogu)'
 }
 
 codigos = {"Hoy": "1d", "Semana": "7d", "Mes": "30d"}
