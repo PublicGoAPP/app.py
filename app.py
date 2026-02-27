@@ -3,27 +3,23 @@ import requests
 from bs4 import BeautifulSoup
 import google.generativeai as genai
 from datetime import datetime
-import time
 
-# --- CONFIGURACIÓN DE IA (REPARADA Y ORDENADA) ---
+# --- CONFIGURACIÓN DE IA ---
 def conectar_ia():
     if "GOOGLE_API_KEY" not in st.secrets:
-        st.error("❌ Falta la clave en Secrets.")
         return None
     try:
         genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-        # En cuentas Pro, se usa el nombre directo para evitar el error 404
         return genai.GenerativeModel('gemini-1.5-flash')
-    except Exception as e:
-        st.error(f"Error de configuración: {e}")
+    except:
         return None
 
-# Definimos el modelo ANTES de las funciones que lo usan
+# Definimos el modelo globalmente
 model = conectar_ia()
 
 st.set_page_config(page_title="Public Go Elite v74", layout="wide")
 
-# --- ESTILOS VISUALES CORPORATIVOS ---
+# --- ESTILOS VISUALES (Tu diseño azul) ---
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
@@ -41,22 +37,13 @@ st.markdown("""
 def generar_analisis_riesgo(cat, data, alcance):
     if model is None:
         return "⚠️ IA no conectada. Revisa los Secrets de Streamlit."
-        
     titulares = "".join([f"[{i}] {n['titulo'].split(' - ')[0]} " for i, n in enumerate(data, 1)])
-    prompt = f"""
-    Actúa como Directora de Riesgo de Public Go. 
-    Analiza estos hechos en Venezuela ({alcance}): {titulares}
-    Estructura tu respuesta así:
-    1. NIVEL DE RIESGO: (Bajo/Medio/Alto)
-    2. ANÁLISIS: Breve impacto en el clima de negocios.
-    3. RECOMENDACIÓN: Acción inmediata para clientes corporativos.
-    Usa [n] para referencias. Sin saludos.
-    """
+    prompt = f"Analiza estos hechos en Venezuela ({alcance}) para la categoría {cat}: {titulares}. Estructura: 1. NIVEL DE RIESGO (Bajo/Medio/Alto), 2. ANÁLISIS, 3. RECOMENDACIÓN."
     try:
         res = model.generate_content(prompt)
         return res.text.strip()
     except Exception as e:
-        return f"⚠️ Error de conexión IA: {str(e)}"
+        return f"⚠️ Error IA: {str(e)}"
 
 @st.cache_data(ttl=600)
 def buscar_rss(query, periodo):
@@ -70,7 +57,7 @@ def buscar_rss(query, periodo):
     except: pass
     return results
 
-# --- SIDEBAR & CÁLCULOS ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.title("🛡️ Public Go")
     alcance = st.radio("Filtro:", ["Hoy", "Semana", "Mes"])
@@ -78,15 +65,15 @@ with st.sidebar:
     st.metric("Tasa BCV", "417.35 Bs", "+0.79%") 
     st.metric("EMBI (Riesgo País)", "18,450 bps", "-50 bps", delta_color="inverse")
 
-# --- CUERPO PRINCIPAL ---
+# --- DASHBOARD ---
 st.title("🛡️ Strategic Insight Dashboard")
 st.subheader("Monitoreo de Riesgo Político y Económico")
 
 CATEGORIAS = {
-    "🏛️ GOBIERNO & PODER": 'Venezuela (Larry Devoe OR Tarek William Saab OR Fiscal OR Asamblea Nacional)',
-    "🛢️ ENERGÍA & LICENCIAS": 'Venezuela (Shell OR Chevron OR PDVSA OR Licencia OR sanciones)',
-    "💰 ECONOMÍA & CONSUMO": 'Venezuela (bcv OR dólar OR inflación OR canasta)',
-    "🌎 RELACIONES EXTERNAS": 'Venezuela (Trump OR Marco Rubio OR Washington OR diplomacia)'
+    "🏛️ GOBIERNO & PODER": 'Venezuela (Larry Devoe OR Tarek William Saab OR Fiscal)',
+    "🛢️ ENERGÍA & LICENCIAS": 'Venezuela (Shell OR Chevron OR PDVSA OR Licencia)',
+    "💰 ECONOMÍA & CONSUMO": 'Venezuela (bcv OR dólar OR inflación)',
+    "🌎 RELACIONES EXTERNAS": 'Venezuela (Trump OR Marco Rubio OR Washington)'
 }
 codigos = {"Hoy": "1d", "Semana": "7d", "Mes": "30d"}
 
@@ -99,12 +86,13 @@ if st.session_state.get('ver'):
         noticias = buscar_rss(q, codigos[alcance])
         
         if noticias:
+            # Aquí estaba el error de nombre de columnas corregido
             c1, c2 = st.columns([1.8, 1.2])
-            with col1:
+            with c1:
                 st.write("**📌 Eventos Detectados**")
                 for j, n in enumerate(noticias, 1):
                     st.markdown(f"<div class='news-item'>[{j}] <a href='{n['link']}' target='_blank' class='news-link'>{n['titulo'].split(' - ')[0]}</a></div>", unsafe_allow_html=True)
-            with col2:
+            with c2:
                 st.write("**🧠 Análisis de Riesgo**")
                 if st.button(f"🔍 Evaluar Riesgo {cat}", key=f"btn_{cat}"):
                     with st.spinner("Calculando impacto..."):
@@ -113,4 +101,4 @@ if st.session_state.get('ver'):
                         st.markdown(f"<div class='{clase}'>{analisis}</div>", unsafe_allow_html=True)
 
 st.divider()
-st.caption(f"Public Go Elite v74.0 | Corte: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+st.caption(f"Public Go Elite v74.2 | {datetime.now().strftime('%d/%m/%Y %H:%M')}")
