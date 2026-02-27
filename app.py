@@ -13,7 +13,7 @@ def conectar_ia():
         # Forzamos a la librería a usar la versión estable 'v1'
         genai.configure(api_key=st.secrets["GOOGLE_API_KEY"], transport='rest')
         # Llamamos al modelo sin el prefijo 'models/'
-        return genai.GenerativeModel('gemini-1.5-flash')
+        return genai.GenerativeModel(model_name='models/gemini-1.5-flash')
     except Exception as e:
         st.error(f"Error: {e}")
         return None
