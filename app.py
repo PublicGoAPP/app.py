@@ -5,51 +5,48 @@ from newspaper import Article
 import google.generativeai as genai
 from datetime import datetime
 
-# --- CONFIGURACIÓN DE IA (GEMINI) ---
-# Debes poner tu API KEY en los "Secrets" de Streamlit o directamente aquí para probar
-genai.configure(api_key="AIzaSyAwvvCJPRJ-d8B72oWb35tdLpAOEmhzZjU")
-model = genai.GenerativeModel('gemini-pro')
+# --- CONFIGURACIÓN DE IA ---
+# Reemplaza con tu clave real o configúrala en los Secrets de Streamlit
+API_KEY = "AIzaSyAwvvCJPRJ-d8B72oWb35tdLpAOEmhzZjU" 
+genai.configure(api_key=API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-# --- CONFIGURACIÓN DE LA APP ---
-st.set_page_config(page_title="Public Go - AI Intelligence", layout="wide")
+st.set_page_config(page_title="Public Go AI Intelligence", layout="wide")
 
-def realizar_analisis_ia(titulo, contenido, contexto_temporal):
+def analizar_con_ia(titulo, texto, periodo):
     prompt = f"""
-    Eres una IA experta en consultoría de asuntos públicos y estrategia en Venezuela.
-    Analiza la siguiente noticia del {contexto_temporal} de febrero de 2026:
+    Actúa como un consultor senior de Public Go en Venezuela. 
+    Analiza esta noticia del {periodo} de febrero de 2026 para una empresa como Empire Keeway:
+    Título: {titulo}
+    Contenido: {texto}
     
-    TÍTULO: {titulo}
-    CONTENIDO: {contenido}
-    
-    PROPORCIONA:
-    1. Un análisis de impacto estratégico para empresas transnacionales.
-    2. Implicaciones en la seguridad jurídica o flujo de caja.
-    3. Una breve recomendación para la alta gerencia.
-    Sé conciso, profesional y directo.
+    Proporciona:
+    1. Impacto estratégico (Jurídico/Económico).
+    2. Riesgos u Oportunidades detectadas.
+    3. Recomendación ejecutiva breve.
     """
     try:
         response = model.generate_content(prompt)
         return response.text
     except:
-        return "El motor de IA no pudo procesar esta noticia en este momento."
+        return "Análisis no disponible en este momento."
 
 # --- MOTOR DE BÚSQUEDA (BASADO EN TU v35.0) ---
-def buscar_noticias_reales(periodo_op):
-    hallazgos = []
-    # Usamos tus palabras clave exactas de la v35.0
+def buscar_noticias(alcance):
+    resultados = []
+    vistos = set()
     queries = [
-        'Venezuela (Shell OR Chevron OR Repsol OR "petróleo" OR "gas" OR "PDVSA" OR "Licencia") "2026"',
-        'Venezuela ("Delcy" OR "Diosdado" OR "Fiscal General" OR "nombramiento" OR "renuncia") "2026"',
-        'Venezuela (Amnistía OR "presos políticos") "2026"',
-        'Venezuela (Trump OR "Washington" OR "Laura Dogu") "2026"'
+        'Venezuela (Shell OR Chevron OR "PDVSA" OR "gas") "2026"',
+        'Venezuela ("Fiscal General" OR "Larry Devoe" OR "renuncia") "2026"',
+        'Venezuela ("Ley de Amnistia" OR "presos politicos") "2026"',
+        'Venezuela (Trump OR "Washington") "2026"'
     ]
     
+    t_param = "d" if alcance == "Hoy" else "w"
     headers = {"User-Agent": "Mozilla/5.0"}
-    vistos = set()
-    periodo_cod = "d" if periodo_op == "Hoy" else "w"
 
     for q in queries:
-        url = f"https://news.google.com/rss/search?q={q.replace(' ', '+')}&hl=es-419&gl=VE&ceid=VE:es-419&tbs=qdr:{periodo_cod}"
+        url = f"https://news.google.com/rss/search?q={q.replace(' ', '+')}&hl=es-419&gl=VE&ceid=VE:es-419&tbs=qdr:{t_param}"
         try:
             r = requests.get(url, headers=headers, timeout=10)
             soup = BeautifulSoup(r.text, 'xml')
@@ -57,39 +54,32 @@ def buscar_noticias_reales(periodo_op):
                 link = item.link.get_text()
                 if link not in vistos:
                     titulo = item.title.get_text().split(" - ")[0]
-                    # Extraer contenido real de la noticia
                     try:
                         art = Article(link, language='es')
                         art.download(); art.parse()
                         cuerpo = art.text[:1000]
-                    except: cuerpo = item.description.get_text()
+                    except: cuerpo = "Contenido extraído de la descripción del feed."
                     
-                    hallazgos.append({"titulo": titulo, "cuerpo": cuerpo, "link": link})
+                    resultados.append({"titulo": titulo, "cuerpo": cuerpo, "link": link})
                     vistos.add(link)
         except: continue
-    return hallazgos
+    return resultados
 
 # --- INTERFAZ ---
-st.title("🛡️ Public Go: AI Strategy Dashboard")
-st.sidebar.title("Filtros Estratégicos")
-periodo = st.sidebar.radio("Alcance:", ["Hoy", "Semana"])
+st.title("🛡️ Public Go: AI Strategy Hub")
+periodo_op = st.sidebar.radio("Alcance:", ["Hoy", "Semana"])
 
-if st.button("🚀 Iniciar Escaneo e Inteligencia Artificial"):
-    noticias = buscar_noticias_reales(periodo)
-    
-    if noticias:
-        st.success(f"Analizando {len(noticias)} eventos detectados...")
-        for n in noticias:
-            with st.expander(f"📌 {n['titulo'].upper()}"):
-                col1, col2 = st.columns([1, 1])
-                with col1:
-                    st.markdown("**Resumen de la Noticia:**")
-                    st.write(n['cuerpo'][:600] + "...")
-                    st.caption(f"[Fuente]({n['link']})")
-                with col2:
-                    st.markdown("**🧠 ANÁLISIS DE INTELIGENCIA (IA):**")
-                    # AQUÍ OCURRE LA MAGIA: La IA analiza LA NOTICIA REAL que encontró el scraping
-                    analisis = realizar_analisis_ia(n['titulo'], n['cuerpo'], periodo)
-                    st.info(analisis)
-    else:
-        st.warning("No se encontraron noticias nuevas con los parámetros de la v35.0.")
+if st.button("🚀 Generar Inteligencia en Tiempo Real"):
+    with st.spinner("La IA está analizando los eventos de 2026..."):
+        noticias = buscar_noticias(periodo_op)
+        if noticias:
+            for n in noticias:
+                with st.expander(f"📌 {n['titulo'].upper()}"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(n['cuerpo'][:500] + "...")
+                        st.caption(f"[Fuente]({n['link']})")
+                    with col2:
+                        st.info(analizar_con_ia(n['titulo'], n['cuerpo'], periodo_op))
+        else:
+            st.warning("No se hallaron noticias frescas. Intenta con el alcance 'Semana'.")
