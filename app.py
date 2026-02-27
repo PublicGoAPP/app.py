@@ -18,7 +18,30 @@ model = conectar_ia()
 
 st.set_page_config(page_title="Public Go Elite", layout="wide")
 
-# --- 2. ESTILOS ---
+# --- 2. MOTOR DE BÚSQUEDA CON BYPASS ---
+def buscar_noticias_seguro(query, periodo):
+    codigos = {"Hoy": "1d", "Semana": "7d", "Mes": "30d"}
+    p = codigos.get(periodo, "7d")
+    url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}+when:{p}&hl=es-419&gl=VE&ceid=VE:es-419"
+    
+    # Simulamos ser un navegador real para evitar el bloqueo (User-Agent)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    
+    results = []
+    try:
+        r = requests.get(url, headers=headers, timeout=20)
+        soup = BeautifulSoup(r.text, 'xml')
+        items = soup.find_all('item')
+        
+        for item in items[:6]:
+            results.append({"titulo": item.title.get_text().split(" - ")[0], "link": item.link.get_text()})
+    except Exception as e:
+        print(f"Error: {e}")
+    return results
+
+# --- 3. ESTILOS ---
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
@@ -31,37 +54,10 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. MOTOR DE BÚSQUEDA (Reforzado para no dar "Vacío") ---
-def buscar_noticias(query, periodo):
-    codigos = {"Hoy": "1d", "Semana": "7d", "Mes": "30d"}
-    p = codigos.get(periodo, "7d") # Si falla el periodo, busca la semana por defecto
-    
-    # Query simplificada para asegurar resultados
-    url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}+when:{p}&hl=es-419&gl=VE&ceid=VE:es-419"
-    
-    results = []
-    try:
-        r = requests.get(url, timeout=15)
-        soup = BeautifulSoup(r.text, 'xml')
-        items = soup.find_all('item')
-        
-        # Si no hay noticias hoy, forzamos búsqueda de la semana automáticamente
-        if not items and periodo == "Hoy":
-            url_backup = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}+when:7d&hl=es-419&gl=VE&ceid=VE:es-419"
-            r = requests.get(url_backup, timeout=15)
-            soup = BeautifulSoup(r.text, 'xml')
-            items = soup.find_all('item')
-
-        for item in items[:6]:
-            results.append({"titulo": item.title.get_text().split(" - ")[0], "link": item.link.get_text()})
-    except:
-        pass
-    return results
-
 # --- 4. SIDEBAR ---
 with st.sidebar:
     st.title("🛡️ Public Go")
-    alcance = st.radio("Filtro Temporal:", ["Hoy", "Semana", "Mes"], index=1) # Por defecto en Semana para que no salga vacío
+    alcance = st.radio("Filtro Temporal:", ["Hoy", "Semana", "Mes"], index=1)
     st.divider()
     st.metric("Tasa BCV", "417.35 Bs", "+0.79%")
     st.metric("EMBI", "18,450 bps", "-50 bps")
@@ -71,29 +67,29 @@ st.title("🛡️ Public Go: AI Strategic Hub")
 
 CATEGORIAS = {
     "🏛️ GOBIERNO": "Venezuela politica",
-    "🛢️ ENERGÍA": "Venezuela petroleo PDVSA",
-    "💰 ECONOMÍA": "Venezuela economia",
-    "🌎 RELACIONES": "Venezuela sanciones"
+    "🛢️ ENERGÍA": "Venezuela petroleo Chevron",
+    "💰 ECONOMÍA": "Venezuela economia inflacion",
+    "🌎 RELACIONES": "Venezuela sanciones Washington"
 }
 
 for cat, q in CATEGORIAS.items():
     st.markdown(f"<div class='cat-header'>{cat}</div>", unsafe_allow_html=True)
-    noticias = buscar_noticias(q, alcance)
+    noticias = buscar_noticias_seguro(q, alcance)
     
     if noticias:
         col1, col2 = st.columns([1.6, 1.4])
         with col1:
-            st.write("**📌 Eventos**")
+            st.write("**📌 Eventos Detectados**")
             texto_ia = ""
             for n in noticias:
                 st.markdown(f"<div class='news-item'><a href='{n['link']}' target='_blank' class='news-link'>{n['titulo']}</a></div>", unsafe_allow_html=True)
                 texto_ia += f"- {n['titulo']}\n"
         with col2:
-            st.write("**🧠 Riesgo**")
+            st.write("**🧠 Análisis de Riesgo**")
             if st.button(f"Analizar {cat}", key=f"btn_{cat}"):
                 if model:
                     with st.spinner("IA analizando..."):
-                        res = model.generate_content(f"Analiza el riesgo de: {texto_ia}")
+                        res = model.generate_content(f"Analiza brevemente el riesgo de: {texto_ia}")
                         st.markdown(f"<div class='risk-box'>{res.text}</div>", unsafe_allow_html=True)
                 else:
                     st.warning("IA no conectada.")
