@@ -7,13 +7,13 @@ import google.generativeai as genai
 from datetime import datetime
 
 # --- CONFIGURACIÓN DE IA ---
-# Para que funcione, debes poner tu clave real o usar st.secrets
-API_KEY = "AIzaSyBRttFwjUUnRkKBIKEgJP8VSmmyY9AWUus" 
+API_KEY = "TU_API_KEY_AQUI" 
 genai.configure(api_key=API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
 st.set_page_config(page_title="Public Go - Strategic Intelligence", layout="wide")
 
+# --- DICCIONARIO ESTRATÉGICO DE PUBLIC GO ---
 CATEGORIAS = {
     "🏛️ GOBIERNO Y TRANSICIÓN": ["fiscal", "devoe", "amnistía", "saab", "asamblea", "nombramiento", "renuncia", "justicia"],
     "🛢️ ENERGÍA Y PETRÓLEO": ["shell", "chevron", "repsol", "gas", "petróleo", "ofac", "licencia", "energía", "pdvsa"],
@@ -21,22 +21,26 @@ CATEGORIAS = {
     "🇺🇸 RELACIONES VENEZUELA-EE.UU.": ["trump", "estados unidos", "unión", "sanciones", "washington", "casa blanca", "socio"]
 }
 
-def generar_analisis_ia_bloque(categoria, noticias_texto, periodo):
-    prompt = f"Analiza estas noticias de {categoria} en Venezuela (Feb 2026): {noticias_texto}. Da una conclusión estratégica para una consultora."
-    try:
-        response = model.generate_content(prompt)
-        return response.text
-    except:
-        # ANÁLISIS DE RESPALDO (SI FALLA LA IA)
-        if "GOBIERNO" in categoria:
-            return "⚠️ **ANÁLISIS ESTRATÉGICO:** El relevo judicial (Saab por Devoe) y las liberaciones por Amnistía indican un esfuerzo por normalizar la institucionalidad para atraer inversión."
-        if "ENERGÍA" in categoria:
-            return "🛢️ **ANÁLISIS ESTRATÉGICO:** Los acuerdos con Shell y Repsol fundamentan la proyección de crecimiento del 10% del PIB para 2026."
-        return "Análisis en proceso. Revise los titulares para detalles individuales."
+def clasificar_noticia(titulo):
+    texto = titulo.lower()
+    for cat, keywords in CATEGORIAS.items():
+        if any(k in texto for k in keywords):
+            return cat
+    return "📑 OTRAS NOTICIAS"
 
-def buscar_inteligencia(periodo_label):
-    p_cod = "d" if periodo_label == "Hoy" else "w"
-    query = 'Venezuela (Fiscal OR "Larry Devoe" OR Shell OR Repsol OR "Ley de Amnistia" OR Trump) "2026"'
+def generar_analisis_respaldo(categoria):
+    analisis = {
+        "🏛️ GOBIERNO Y TRANSICIÓN": "La reestructuración judicial y las liberaciones por Amnistía buscan normalizar la institucionalidad para validar la transición internacionalmente.",
+        "🛢️ ENERGÍA Y PETRÓLEO": "La reactivación de convenios con Shell y Repsol fundamenta la entrada de divisas y la estabilidad de las operaciones transnacionales.",
+        "💰 ECONOMÍA Y NEGOCIOS": "El clima de optimismo y la estabilidad cambiaria sustentan la proyección de crecimiento del 10% del PIB para el cierre de 2026.",
+        "🇺🇸 RELACIONES VENEZUELA-EE.UU.": "El reconocimiento de Venezuela como 'socio' por la administración Trump redefine el marco de sanciones y licencias operativas."
+    }
+    return analisis.get(categoria, "Análisis de entorno en desarrollo. Monitoreo preventivo activado.")
+
+def buscar_inteligencia_completa(alcance):
+    p_cod = "d" if alcance == "Hoy" else "w"
+    # Query expandida para capturar todos tus pilares
+    query = 'Venezuela (Fiscal OR "Larry Devoe" OR Shell OR Repsol OR PIB OR Trump OR "Ley de Amnistia") "2026"'
     url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}&hl=es-419&gl=VE&ceid=VE:es-419&tbs=qdr:{p_cod}"
     
     hallazgos = []
@@ -44,35 +48,52 @@ def buscar_inteligencia(periodo_label):
     try:
         r = requests.get(url, timeout=10)
         soup = BeautifulSoup(r.text, 'xml')
-        items = soup.find_all('item')
-        for item in items[:15]:
+        for item in soup.find_all('item')[:25]: # Aumentamos el rango de búsqueda
             link = item.link.get_text()
             if link not in vistos:
                 titulo = item.title.get_text().split(" - ")[0]
-                hallazgos.append({"titulo": titulo, "cuerpo": "Analizando contenido...", "link": link, "categoria": "🏛️ GOBIERNO Y TRANSICIÓN" if "fiscal" in titulo.lower() or "amnistía" in titulo.lower() else "📑 OTROS"})
+                hallazgos.append({
+                    "titulo": titulo,
+                    "link": link,
+                    "categoria": clasificar_noticia(titulo)
+                })
                 vistos.add(link)
     except: pass
     return hallazgos
 
 # --- INTERFAZ ---
-st.title("🛡️ Public Go: Dashboard Estratégico")
+st.title("🛡️ Public Go: Dashboard Estratégico Multicapa")
 periodo = st.sidebar.selectbox("Alcance:", ["Hoy", "Semana"])
 
 if st.button("🚀 Actualizar Inteligencia"):
-    data = buscar_inteligencia(periodo)
+    data = buscar_inteligencia_completa(periodo)
     if data:
         df = pd.DataFrame(data)
-        st.metric("Actividad detectada", f"{len(df)} noticias", periodo)
         
-        for cat in df['categoria'].unique():
-            st.subheader(cat)
+        # Mostrar por cada categoría definida
+        for cat in CATEGORIAS.keys():
             noticias_cat = df[df['categoria'] == cat]
-            texto_bloque = " | ".join(noticias_cat['titulo'].tolist())
             
-            st.info(generar_analisis_ia_bloque(cat, texto_bloque, periodo))
-            
-            for _, row in noticias_cat.iterrows():
-                with st.expander(f"📌 {row['titulo']}"):
-                    st.caption(f"[Fuente]({row['link']})")
+            if not noticias_cat.empty:
+                st.subheader(cat)
+                # Intento de IA, si no, usa respaldo
+                texto_bloque = " | ".join(noticias_cat['titulo'].tolist())
+                try:
+                    response = model.generate_content(f"Analiza estas noticias de {cat}: {texto_bloque}")
+                    st.info(response.text)
+                except:
+                    st.info(generar_analisis_respaldo(cat))
+                
+                for _, row in noticias_cat.iterrows():
+                    with st.expander(f"📌 {row['titulo']}"):
+                        st.caption(f"[Fuente Oficial]({row['link']})")
+                st.divider()
+        
+        # Otros Temas
+        otros = df[df['categoria'] == "📑 OTRAS NOTICIAS"]
+        if not otros.empty:
+            with st.expander("📑 OTRAS NOTICIAS DETECTADAS"):
+                for _, row in otros.iterrows():
+                    st.write(f"• {row['titulo']} ([Fuente]({row['link']}))")
     else:
-        st.warning("No se hallaron noticias.")
+        st.warning("No se hallaron noticias frescas.")
