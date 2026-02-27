@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 import google.generativeai as genai
 from datetime import datetime
 import pandas as pd
+import time
 
 # --- CONFIGURACIÓN DE IA ---
 def conectar_ia():
@@ -15,7 +16,7 @@ def conectar_ia():
 
 model = conectar_ia()
 
-st.set_page_config(page_title="Public Go Elite v65", layout="wide")
+st.set_page_config(page_title="Public Go Elite v66", layout="wide")
 
 # --- ESTILOS VISUALES ---
 st.markdown("""
@@ -31,34 +32,28 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- MOTOR DE CÁLCULO DE VARIACIÓN (LÓGICA INTERNA) ---
+# --- LÓGICA DE VARIACIÓN ---
 def calcular_variacion_real(alcance):
-    # Hitos de tasa oficial (Sincronizados al 27/02/2026)
     tasa_actual = 417.3579
-    
-    # Precios de cierre históricos referenciales
-    cierres = {
-        "Hoy": 414.0594,      # Cierre anterior (26/02)
-        "Semana": 412.2030,   # Cierre hace 7 días
-        "Mes": 401.3055       # Cierre hace 30 días
-    }
-    
+    cierres = {"Hoy": 414.0594, "Semana": 412.2030, "Mes": 401.3055}
     precio_previo = cierres.get(alcance)
-    # Cálculo aritmético puro: ((Actual - Anterior) / Anterior) * 100
     variacion_pct = ((tasa_actual - precio_previo) / precio_previo) * 100
-    
     return tasa_actual, variacion_pct
 
-# --- FUNCIONES DE BÚSQUEDA Y ANÁLISIS ---
+# --- FUNCIONES DE IA Y BÚSQUEDA ---
 def generar_analisis_categoria(cat, data, alcance):
     titulares = "".join([f"[{i}] {n['titulo'].split(' - ')[0]} " for i, n in enumerate(data, 1)])
     prompt = f"Eres Directora de Public Go. Analiza {cat} en Venezuela ({alcance}) para hoy 27 de febrero 2026: {titulares}. Sin saludos. Usa [n] para referencias. Recomendación final estratégica."
     try:
+        # Añadimos un pequeño delay para evitar el límite de la API
+        time.sleep(1)
         res = model.generate_content(prompt).text
         for f in ["Estimados", "Como Directora", "He realizado"]: res = res.replace(f, "")
         return res.strip()
-    except: return "⚠️ Unidad de inteligencia saturada. Reintente en segundos."
+    except Exception as e:
+        return f"⚠️ Unidad de inteligencia en espera. Intente de nuevo en 5 segundos."
 
+@st.cache_data(ttl=600)
 def buscar_rss(query, periodo):
     url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}+when:{periodo}&hl=es-419&gl=VE&ceid=VE:es-419"
     results = []
@@ -70,21 +65,13 @@ def buscar_rss(query, periodo):
     except: pass
     return results
 
-# --- INTERFAZ SIDEBAR ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.title("🛡️ Public Go")
     alcance = st.radio("Filtro Temporal:", ["Hoy", "Semana", "Mes"])
     st.divider()
-    
-    # Ejecución del cálculo de variación
     tasa, variacion = calcular_variacion_real(alcance)
-    
-    st.metric(
-        label="Tasa Oficial BCV", 
-        value=f"{tasa:.4f} Bs", 
-        delta=f"{variacion:+.2f}%"
-    )
-    
+    st.metric(label="Tasa Oficial BCV", value=f"{tasa:.4f} Bs", delta=f"{variacion:+.2f}%")
     st.metric("Riesgo País (EMBI)", "18,450 bps", "-50 bps", delta_color="inverse")
     st.divider()
     st.write("📊 **Monitor de Energía**")
@@ -102,24 +89,40 @@ CATEGORIAS = {
 }
 codigos = {"Hoy": "1d", "Semana": "7d", "Mes": "30d"}
 
-if st.button("🚀 ANÁLISIS INFORMATIVO E INTELIGENCIA"):
-    st.session_state['ver'] = True
+# Inicializar estados para evitar que la app se resetee al analizar
+if 'mostrar_analisis' not in st.session_state:
+    st.session_state['mostrar_analisis'] = {}
 
-if st.session_state.get('ver'):
+if st.button("🚀 ANÁLISIS INFORMATIVO E INTELIGENCIA"):
+    st.session_state['ver_noticias'] = True
+    st.session_state['mostrar_analisis'] = {} # Limpiar análisis previos al recargar
+
+if st.session_state.get('ver_noticias'):
     for cat, q in CATEGORIAS.items():
         st.markdown(f"<div class='cat-header'>{cat}</div>", unsafe_allow_html=True)
         noticias = buscar_rss(q, codigos[alcance])
+        
         if noticias:
             col_n, col_d = st.columns([2, 1.2])
             with col_n:
                 st.write("**📌 Noticias**")
                 for j, n in enumerate(noticias, 1):
                     st.markdown(f"<div class='news-item'><span class='ref-tag'>[{j}]</span><a href='{n['link']}' target='_blank' class='news-link'>{n['titulo'].split(' - ')[0]}</a></div>", unsafe_allow_html=True)
+            
             with col_d:
                 st.write("**🧠 Análisis de Inteligencia**")
-                if st.button(f"🔍 Analizar {cat}", key=cat):
-                    with st.spinner("Generando inteligencia estratégica..."):
-                        st.markdown(f"<div class='analysis-box'>{generar_analisis_categoria(cat, noticias, alcance)}</div>", unsafe_allow_html=True)
+                
+                # Botón de análisis
+                if st.button(f"🔍 Analizar {cat}", key=f"btn_{cat}"):
+                    with st.spinner("Procesando inteligencia..."):
+                        resultado = generar_analisis_categoria(cat, noticias, alcance)
+                        st.session_state['mostrar_analisis'][cat] = resultado
+                
+                # Mostrar el resultado si existe en el estado
+                if cat in st.session_state['mostrar_analisis']:
+                    st.markdown(f"<div class='analysis-box'>{st.session_state['mostrar_analisis'][cat]}</div>", unsafe_allow_html=True)
+                else:
+                    st.info("Haga clic para generar análisis.")
 
 st.divider()
-st.caption("Uso exclusivo Public Go Consultores. Variación calculada bajo estándares financieros internos.")
+st.caption("Uso exclusivo Public Go Consultores.")
