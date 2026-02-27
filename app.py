@@ -5,6 +5,7 @@ import pandas as pd
 import google.generativeai as genai
 from datetime import datetime
 import re
+import time  # <--- IMPORTANTE: Necesario para la pausa entre peticiones
 
 # --- CONFIGURACIÓN DE IA (OMNI-CONEXIÓN v53 BASE) ---
 def conectar_ia_robusta():
@@ -56,7 +57,7 @@ def generar_analisis_inteligente(cat, data, alcance):
     Eres la Directora de Estrategia de Public Go. Analiza estos hechos de {cat} en Venezuela ({alcance}) para hoy 27 de febrero 2026: {titulares_numerados}. 
     
     INSTRUCCIONES CRÍTICAS:
-    1. PROHIBIDO: No uses introducciones, ni saludos, ni frases como 'Estimados colegas' o 'He realizado un análisis'.
+    1. PROHIBIDO: No uses introducciones, ni saludos, ni frases amables.
     2. REFERENCIAS: Cada vez que menciones un hecho o hagas una afirmación, DEBES incluir el número de la fuente entre corchetes, ej: [1] o [1, 3].
     3. ESTRUCTURA: Ve directo al grano. Identifica la tendencia y el impacto. 
     4. CUANTITATIVO: Solo si hay cifras relevantes en los titulares, analízalas.
@@ -70,8 +71,8 @@ def generar_analisis_inteligente(cat, data, alcance):
         for frase in frases_a_borrar:
             respuesta = respuesta.replace(frase, "")
         return respuesta.strip()
-    except:
-        return "El análisis estratégico está siendo procesado por la unidad de inteligencia..."
+    except Exception as e:
+        return f"⚠️ Unidad de inteligencia saturada. Reintentando... ({str(e)[:30]})"
 
 def buscar_rss_profundo(query, periodo_cod):
     url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}+when:{periodo_cod}&hl=es-419&gl=VE&ceid=VE:es-419"
@@ -125,9 +126,13 @@ if st.button("🚀 ANÁLISIS INFORMATIVO E INTELIGENCIA"):
                     """, unsafe_allow_html=True)
             
             with col_diag:
-                # 2. Nombre cambiado a Análisis de Inteligencia
                 st.write("**🧠 Análisis de Inteligencia**")
-                st.markdown(f"<div class='analysis-box'>{generar_analisis_inteligente(cat, noticias, alcance)}</div>", unsafe_allow_html=True)
+                # Llamada a la IA con pequeña pausa para evitar errores de cuota (429)
+                analisis = generar_analisis_inteligente(cat, noticias, alcance)
+                st.markdown(f"<div class='analysis-box'>{analisis}</div>", unsafe_allow_html=True)
+            
+            # PAUSA ESTRATÉGICA: 2.5 segundos para que la API respire entre categorías
+            time.sleep(2.5) 
         else:
             st.info(f"Sin novedades significativas en el eje de {cat}.")
 
