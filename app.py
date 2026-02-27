@@ -15,7 +15,7 @@ def conectar_ia_robusta():
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     try:
         modelos_validos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        prioridad = ['models/gemini-1.5-flash', 'models/gemini-1.5-pro', 'models/gemini-pro']
+        prioridad = ['models/gemini-1.5-flash', 'models/gemini-pro']
         for p in prioridad:
             if p in modelos_validos: return genai.GenerativeModel(p)
         return genai.GenerativeModel(modelos_validos[0]) if modelos_validos else None
@@ -23,7 +23,7 @@ def conectar_ia_robusta():
 
 model = conectar_ia_robusta()
 
-st.set_page_config(page_title="Public Go Elite v55.8", layout="wide")
+st.set_page_config(page_title="Public Go Elite v55.9", layout="wide")
 
 # --- ESTILOS ---
 st.markdown("""
@@ -44,25 +44,21 @@ def generar_analisis_inteligente(cat, data, alcance):
     if not model: return "Error de conexión."
     titulares_numerados = "".join([f"[{i}] {n['titulo'].split(' - ')[0]} " for i, n in enumerate(data, 1)])
     
-    prompt = f"""
-    Eres la Directora de Estrategia de Public Go. Analiza: {cat} en Venezuela ({alcance}) para hoy 27 de febrero 2026: {titulares_numerados}. 
-    INSTRUCCIONES:
-    1. PROHIBIDO: Introducciones, saludos o frases amables. 
-    2. REFERENCIAS: Usa [n] para sustentar cada afirmación.
-    3. ESTILO: Directo, tipo informe de inteligencia.
-    4. CUANTITATIVO: Solo si hay cifras.
-    5. RECOMENDACIÓN: Una frase final.
-    """
-    try:
-        # Añadimos un pequeño retardo interno también para asegurar estabilidad
-        respuesta = model.generate_content(prompt).text
-        for frase in ["Estimados", "Como Directora", "He realizado", "Diagnóstico"]:
-            respuesta = respuesta.replace(frase, "")
-        return respuesta.strip()
-    except Exception as e:
-        if "429" in str(e):
-            return "⚠️ El servidor de Google está procesando muchas solicitudes. Por favor, espere 10 segundos y vuelva a presionar el botón de Análisis."
-        return f"⚠️ Error en unidad de inteligencia: {str(e)[:30]}"
+    prompt = f"Como Directora de Public Go, analiza estos hechos de {cat} en Venezuela ({alcance}) para hoy 27 de febrero 2026: {titulares_numerados}. Instrucciones: 1. Sin saludos. 2. Usa [n] para referencias. 3. Directo al grano. 4. Recomendación final."
+    
+    # Lógica de reintento automático (Exponential Backoff)
+    for intento in range(3):
+        try:
+            respuesta = model.generate_content(prompt).text
+            for frase in ["Estimados", "Como Directora", "He realizado", "Diagnóstico"]:
+                respuesta = respuesta.replace(frase, "")
+            return respuesta.strip()
+        except Exception as e:
+            if "429" in str(e):
+                time.sleep(5 * (intento + 1)) # Espera más en cada intento
+                continue
+            return f"⚠️ Error en unidad de inteligencia: {str(e)[:30]}"
+    return "⚠️ El servidor de Google está muy congestionado. El análisis no pudo completarse tras 3 intentos."
 
 def buscar_rss(query, periodo_cod):
     url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}+when:{periodo_cod}&hl=es-419&gl=VE&ceid=VE:es-419"
@@ -96,7 +92,9 @@ CATEGORIAS = {
 codigos = {"Hoy": "1d", "Semana": "7d", "Mes": "30d"}
 
 if st.button("🚀 ANÁLISIS INFORMATIVO E INTELIGENCIA"):
-    for cat, q in CATEGORIAS.items():
+    progreso = st.progress(0)
+    for i, (cat, q) in enumerate(CATEGORIAS.items()):
+        progreso.progress((i + 1) / len(CATEGORIAS))
         st.markdown(f"<div class='cat-header'>{cat}</div>", unsafe_allow_html=True)
         noticias = buscar_rss(q, codigos[alcance])
         
@@ -104,18 +102,19 @@ if st.button("🚀 ANÁLISIS INFORMATIVO E INTELIGENCIA"):
             col_news, col_diag = st.columns([2, 1.2])
             with col_news:
                 st.write("**📌 Noticias Recientes**")
-                for i, n in enumerate(noticias, 1):
-                    st.markdown(f"<div class='news-item'><span class='ref-tag'>[{i}]</span><a href='{n['link']}' target='_blank' class='news-link'>{n['titulo'].split(' - ')[0]}</a></div>", unsafe_allow_html=True)
+                for j, n in enumerate(noticias, 1):
+                    st.markdown(f"<div class='news-item'><span class='ref-tag'>[{j}]</span><a href='{n['link']}' target='_blank' class='news-link'>{n['titulo'].split(' - ')[0]}</a></div>", unsafe_allow_html=True)
             
             with col_diag:
                 st.write("**🧠 Análisis de Inteligencia**")
                 analisis = generar_analisis_inteligente(cat, noticias, alcance)
                 st.markdown(f"<div class='analysis-box'>{analisis}</div>", unsafe_allow_html=True)
             
-            # PAUSA EXTENDIDA: 4 segundos para evitar el error 429
+            # Pausa de seguridad entre categorías
             time.sleep(4.0) 
         else:
             st.info(f"Sin novedades en {cat}.")
+    progreso.empty()
 
 st.divider()
 st.caption("Uso exclusivo Public Go Consultores.")
