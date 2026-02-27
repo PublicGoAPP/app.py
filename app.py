@@ -3,113 +3,107 @@ import requests
 from bs4 import BeautifulSoup
 import google.generativeai as genai
 from datetime import datetime
+import time
 
-# --- CONFIGURACIÓN IA PRO (Solución al Error 404 de Pago) ---
+# --- CONFIGURACIÓN DE IA (Preparada para Cuota de Pago) ---
 def conectar_ia():
     if "GOOGLE_API_KEY" not in st.secrets:
+        st.error("❌ Falta la clave en Secrets.")
         return None
-    try:
-        genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-        # En cuentas Pro, se usa el nombre directo sin prefijos beta
-        return genai.GenerativeModel('gemini-1.5-flash')
-    except Exception as e:
-        st.error(f"Error de configuración: {e}")
-        return None
+   genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+model = genai.GenerativeModel('gemini-1.5-flash') # Quitamos el prefijo models/
 
 model = conectar_ia()
 
-# --- CONFIGURACIÓN VISUAL PUBLIC GO ---
-st.set_page_config(page_title="Public Go Intelligence Hub", layout="wide")
+st.set_page_config(page_title="Public Go Elite v74", layout="wide")
 
+# --- ESTILOS VISUALES CORPORATIVOS ---
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
     [data-testid="stSidebar"] { background-color: #003b5c !important; }
     [data-testid="stSidebar"] * { color: #ffffff !important; }
-    .main-title { color: #003b5c; font-weight: 800; font-size: 2.8rem; }
-    .cat-header { background-color: #003b5c; color: white; padding: 12px; border-radius: 5px; font-weight: bold; margin-top: 30px; border-left: 10px solid #f1c40f; }
-    .risk-card { background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 12px solid #003b5c; box-shadow: 2px 2px 10px rgba(0,0,0,0.05); }
-    .news-box { border-bottom: 1px solid #eee; padding: 12px 0; }
-    .news-link { color: #003b5c; text-decoration: none; font-weight: bold; }
-    .news-link:hover { color: #f1c40f; }
+    .cat-header { background-color: #003b5c; color: white; padding: 10px; border-radius: 5px; font-weight: bold; margin-top: 25px; text-transform: uppercase; }
+    .risk-high { border-left: 8px solid #d9534f; background-color: #fff5f5; padding: 15px; border-radius: 5px; }
+    .risk-med { border-left: 8px solid #f0ad4e; background-color: #fff9f0; padding: 15px; border-radius: 5px; }
+    .news-item { border-bottom: 1px solid #f0f0f0; padding: 12px 0; }
+    .news-link { color: #003b5c; text-decoration: none; font-weight: 500; font-size: 1.05rem; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- MOTOR DE INTELIGENCIA ESTRATÉGICA ---
-def generar_inteligencia(cat, titulares, periodo):
+# --- CAPA DE INTELIGENCIA DE RIESGO ---
+def generar_analisis_riesgo(cat, data, alcance):
+    titulares = "".join([f"[{i}] {n['titulo'].split(' - ')[0]} " for i, n in enumerate(data, 1)])
+    # Prompt enfocado en Riesgo Político y Corporativo
     prompt = f"""
-    Eres la Directora de Estrategia de Public Go. Analiza estos eventos en Venezuela ({periodo}) para {cat}:
-    {titulares}
-    
-    ESTRUCTURA DE RESPUESTA:
-    1. 📊 ÍNDICE DE RIESGO POLÍTICO: (Escala 1-10 y por qué)
-    2. 🛢️ IMPACTO EN ENERGÍA Y NEGOCIOS: (Análisis sobre crudo, gas, licencias o flujo de caja)
-    3. 🛡️ RECOMENDACIÓN EJECUTIVA: (Acción sugerida para el cliente hoy)
+    Actúa como Directora de Riesgo de Public Go. 
+    Analiza estos hechos en Venezuela ({alcance}): {titulares}
+    Estructura tu respuesta así:
+    1. NIVEL DE RIESGO: (Bajo/Medio/Alto)
+    2. ANÁLISIS: Breve impacto en el clima de negocios.
+    3. RECOMENDACIÓN: Acción inmediata para clientes corporativos.
+    Usa [n] para referencias. Sin saludos.
     """
     try:
-        # Forzamos la llamada de producción para evitar el error 404
         res = model.generate_content(prompt)
-        return res.text
+        return res.text.strip()
     except Exception as e:
-        return f"⚠️ Error de conexión Pro: {str(e)}. Intenta reiniciar la App."
+        return f"⚠️ Error de conexión: {str(e)}"
 
-# --- MOTOR DE BÚSQUEDA LIMPIO (Sin Repeticiones) ---
-def buscar_noticias_limpias(query, periodo):
-    time_code = {"Hoy": "1d", "Semana": "7d", "Mes": "30d"}[periodo]
-    url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}&hl=es-419&gl=VE&ceid=VE:es-419&tbs=qdr:{time_code}"
-    
-    hallazgos = []
-    vistos = set() # Para evitar noticias repetidas
+@st.cache_data(ttl=600)
+def buscar_rss(query, periodo):
+    url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}+when:{periodo}&hl=es-419&gl=VE&ceid=VE:es-419"
+    results = []
     try:
         r = requests.get(url, timeout=12)
-        sopa = BeautifulSoup(r.text, 'xml')
-        for item in sopa.find_all('item'):
-            titulo = item.title.get_text().split(" - ")[0]
-            # Limpieza de duplicados por palabras clave en el título
-            token = titulo[:30].lower() 
-            if token not in vistos and len(hallazgos) < 4:
-                hallazgos.append({"titulo": titulo, "link": item.link.get_text()})
-                vistos.add(token)
+        soup = BeautifulSoup(r.text, 'xml')
+        for item in soup.find_all('item')[:7]:
+            results.append({"titulo": item.title.get_text(), "link": item.link.get_text()})
     except: pass
-    return hallazgos
+    return results
 
-# --- SIDEBAR ---
+# --- SIDEBAR & CÁLCULOS ---
 with st.sidebar:
     st.title("🛡️ Public Go")
-    alcance = st.selectbox("Ventana de Análisis:", ["Hoy", "Semana", "Mes"])
+    alcance = st.radio("Filtro:", ["Hoy", "Semana", "Mes"])
     st.divider()
-    st.metric("Tasa Oficial BCV", "417.36 Bs", "+0.79%")
-    st.success("SISTEMA: Nivel 1 (Producción)")
+    st.metric("Tasa BCV", "417.35 Bs", "+0.79%") # Simulado para estabilidad de UI
+    st.metric("EMBI (Riesgo País)", "18,450 bps", "-50 bps", delta_color="inverse")
 
-# --- DASHBOARD ---
-st.markdown("<h1 class='main-title'>Strategic Insight Dashboard</h1>", unsafe_allow_html=True)
-st.write(f"Inteligencia Estratégica | Venezuela - {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+# --- CUERPO PRINCIPAL ---
+st.title("🛡️ Strategic Insight Dashboard")
+st.subheader("Monitoreo de Riesgo Político y Económico")
 
 CATEGORIAS = {
-    "🏛️ GOBERNANZA Y PODER": 'Venezuela ("Larry Devoe" OR "Tarek William Saab" OR "Fiscalía")',
-    "🛢️ ENERGÍA Y LICENCIAS": 'Venezuela (Chevron OR Shell OR PDVSA OR Licencia OR gas)',
-    "💰 MACRO Y MERCADO": 'Venezuela (BCV OR "dólar" OR "inflación" OR "aranceles")'
+    "🏛️ GOBIERNO & PODER": 'Venezuela (Larry Devoe OR Tarek William Saab OR Fiscal OR Asamblea Nacional)',
+    "🛢️ ENERGÍA & LICENCIAS": 'Venezuela (Shell OR Chevron OR PDVSA OR Licencia OR sanciones)',
+    "💰 ECONOMÍA & CONSUMO": 'Venezuela (bcv OR dólar OR inflación OR canasta)',
+    "🌎 RELACIONES EXTERNAS": 'Venezuela (Trump OR Marco Rubio OR Washington OR diplomacia)'
 }
+codigos = {"Hoy": "1d", "Semana": "7d", "Mes": "30d"}
 
-if st.button("🚀 GENERAR INTELIGENCIA INTEGRAL"):
-    for cat, query in CATEGORIAS.items():
+if st.button("🚀 GENERAR REPORTE DE INTELIGENCIA"):
+    st.session_state['ver'] = True
+
+if st.session_state.get('ver'):
+    for cat, q in CATEGORIAS.items():
         st.markdown(f"<div class='cat-header'>{cat}</div>", unsafe_allow_html=True)
-        noticias = buscar_noticias_limpias(query, alcance)
+        noticias = buscar_rss(q, codigos[alcance])
         
         if noticias:
-            c1, c2 = st.columns([1, 1.2])
+            c1, c2 = st.columns([1.8, 1.2])
             with c1:
-                st.write("**Eventos Detectados:**")
-                titulares_texto = ""
-                for n in noticias:
-                    st.markdown(f"<div class='news-box'><a class='news-link' href='{n['link']}' target='_blank'>{n['titulo']}</a></div>", unsafe_allow_html=True)
-                    titulares_texto += f"- {n['titulo']}\n"
+                st.write("**📌 Eventos Detectados**")
+                for j, n in enumerate(noticias, 1):
+                    st.markdown(f"<div class='news-item'>[{j}] <a href='{n['link']}' target='_blank' class='news-link'>{n['titulo'].split(' - ')[0]}</a></div>", unsafe_allow_html=True)
             with c2:
-                with st.spinner(f"IA analizando {cat}..."):
-                    analisis = generar_inteligencia(cat, titulares_texto, alcance)
-                    st.markdown(f"<div class='risk-card'>{analisis}</div>", unsafe_allow_html=True)
-        else:
-            st.info(f"Sin cambios críticos detectados en {cat} para este periodo.")
+                st.write("**🧠 Análisis de Riesgo**")
+                if st.button(f"🔍 Evaluar Riesgo {cat}", key=cat):
+                    with st.spinner("Calculando impacto..."):
+                        analisis = generar_analisis_riesgo(cat, noticias, alcance)
+                        # Clase visual según riesgo
+                        clase = "risk-high" if "ALTO" in analisis.upper() else "risk-med"
+                        st.markdown(f"<div class='{clase}'>{analisis}</div>", unsafe_allow_html=True)
 
 st.divider()
-st.caption("Public Go Elite v85.0 | Confidencial")
+st.caption(f"Public Go Elite v74.0 | Corte: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
