@@ -3,7 +3,6 @@ import requests
 from bs4 import BeautifulSoup
 import google.generativeai as genai
 from datetime import datetime
-import pandas as pd
 import time
 
 # --- CONFIGURACIÓN DE IA ---
@@ -16,7 +15,7 @@ def conectar_ia():
 
 model = conectar_ia()
 
-st.set_page_config(page_title="Public Go Elite v66", layout="wide")
+st.set_page_config(page_title="Public Go Elite v67", layout="wide")
 
 # --- ESTILOS VISUALES ---
 st.markdown("""
@@ -40,18 +39,25 @@ def calcular_variacion_real(alcance):
     variacion_pct = ((tasa_actual - precio_previo) / precio_previo) * 100
     return tasa_actual, variacion_pct
 
-# --- FUNCIONES DE IA Y BÚSQUEDA ---
+# --- FUNCIONES DE IA CON AUTO-REINTENTO ---
 def generar_analisis_categoria(cat, data, alcance):
     titulares = "".join([f"[{i}] {n['titulo'].split(' - ')[0]} " for i, n in enumerate(data, 1)])
-    prompt = f"Eres Directora de Public Go. Analiza {cat} en Venezuela ({alcance}) para hoy 27 de febrero 2026: {titulares}. Sin saludos. Usa [n] para referencias. Recomendación final estratégica."
-    try:
-        # Añadimos un pequeño delay para evitar el límite de la API
-        time.sleep(1)
-        res = model.generate_content(prompt).text
-        for f in ["Estimados", "Como Directora", "He realizado"]: res = res.replace(f, "")
-        return res.strip()
-    except Exception as e:
-        return f"⚠️ Unidad de inteligencia en espera. Intente de nuevo en 5 segundos."
+    prompt = f"Analiza para Public Go (Venezuela, {alcance}): {titulares}. Sin saludos. Usa [n] para fuentes. Directo al impacto y recomendación."
+    
+    # Lógica de reintento automático
+    for intento in range(3):
+        try:
+            res = model.generate_content(prompt)
+            texto = res.text
+            for f in ["Estimados", "Como Directora", "He realizado"]: 
+                texto = texto.replace(f, "")
+            return texto.strip()
+        except Exception as e:
+            if "429" in str(e): # Error de saturación
+                time.sleep(2 * (intento + 1)) # Espera 2, luego 4, luego 6 seg
+                continue
+            return "⚠️ Unidad de inteligencia ocupada. Por favor, reintente en un momento."
+    return "⚠️ Google está procesando muchas solicitudes globales. Intente de nuevo en 10 segundos."
 
 @st.cache_data(ttl=600)
 def buscar_rss(query, periodo):
@@ -83,19 +89,18 @@ st.write(f"Corte Informativo: **27/02/2026**")
 
 CATEGORIAS = {
     "🏛️ GOBIERNO": 'Venezuela (Delcy OR Diosdado OR Fiscal General OR ministro OR nombramiento OR renuncia)',
-    "🛢️ ENERGÍA": 'Venezuela (Shell OR Chevron OR Repsol OR petróleo OR gas OR PDVSA OR energía OR Licencia)',
-    "💰 ECONOMÍA": 'Venezuela (bcv OR dólar OR tasa OR pib OR crecimiento OR consumidor OR inversión OR arancel)',
-    "🌎 RELACIONES": 'Venezuela (Trump OR Marco Rubio OR Washintong OR sanciones OR Laura Doghu)'
+    "🛢️ ENERGÍA": 'Venezuela (Shell OR Chevron OR PDVSA OR gas OR Licencia)',
+    "💰 ECONOMÍA": 'Venezuela (bcv OR dólar OR tasa OR pib OR crecimiento OR inversión)',
+    "🌎 RELACIONES": 'Venezuela (Trump OR Marco Rubio OR Washington OR sanciones)'
 }
 codigos = {"Hoy": "1d", "Semana": "7d", "Mes": "30d"}
 
-# Inicializar estados para evitar que la app se resetee al analizar
 if 'mostrar_analisis' not in st.session_state:
     st.session_state['mostrar_analisis'] = {}
 
 if st.button("🚀 ANÁLISIS INFORMATIVO E INTELIGENCIA"):
     st.session_state['ver_noticias'] = True
-    st.session_state['mostrar_analisis'] = {} # Limpiar análisis previos al recargar
+    st.session_state['mostrar_analisis'] = {} 
 
 if st.session_state.get('ver_noticias'):
     for cat, q in CATEGORIAS.items():
@@ -111,18 +116,15 @@ if st.session_state.get('ver_noticias'):
             
             with col_d:
                 st.write("**🧠 Análisis de Inteligencia**")
-                
-                # Botón de análisis
                 if st.button(f"🔍 Analizar {cat}", key=f"btn_{cat}"):
-                    with st.spinner("Procesando inteligencia..."):
+                    with st.spinner("Procesando inteligencia estratégica..."):
                         resultado = generar_analisis_categoria(cat, noticias, alcance)
                         st.session_state['mostrar_analisis'][cat] = resultado
                 
-                # Mostrar el resultado si existe en el estado
                 if cat in st.session_state['mostrar_analisis']:
                     st.markdown(f"<div class='analysis-box'>{st.session_state['mostrar_analisis'][cat]}</div>", unsafe_allow_html=True)
-                else:
-                    st.info("Haga clic para generar análisis.")
+        else:
+            st.info(f"Sin novedades en {cat}.")
 
 st.divider()
 st.caption("Uso exclusivo Public Go Consultores.")
