@@ -69,25 +69,36 @@ color_map = {
 
 if not df_intel.empty:
     for _, row in df_intel.iterrows():
-        # Buscamos la columna de categoría (manejando posibles tildes o variaciones)
-        cat_val = row.get('Categoría', row.get('Categoria', 'GENERAL'))
-        categoria_label = str(cat_val).upper().strip()
-        bg_color = color_map.get(categoria_label, "#7F8C8D")
+        # --- LÓGICA DE LIMPIEZA DE CATEGORÍA ---
+        raw_cat = str(row.get('Categoría', 'GENERAL')).upper()
         
-        # Diseño de dos columnas: Noticia (izq) | Análisis (der)
+        # Esto extrae solo la palabra clave (ej: PETRÓLEO) aunque diga "CATEGORIA: PETRÓLEO"
+        if "PETRÓLEO" in raw_cat or "PETROLEO" in raw_cat:
+            clean_cat, bg_color = "PETRÓLEO", "#E67E22"
+        elif "ECONOMÍA" in raw_cat or "ECONOMIA" in raw_cat:
+            clean_cat, bg_color = "ECONOMÍA", "#27AE60"
+        elif "POLÍTICA" in raw_cat or "POLITICA" in raw_cat:
+            clean_cat, bg_color = "POLÍTICA", "#2980B9"
+        elif "RELACIONES" in raw_cat:
+            clean_cat, bg_color = "RELACIONES INTERNACIONALES", "#C0392B"
+        else:
+            clean_cat, bg_color = "GENERAL", "#7F8C8D"
+
         with st.container():
             st.markdown(f'<div class="report-card">', unsafe_allow_html=True)
             col_info, col_anid = st.columns([1.2, 2])
             
             with col_info:
-                st.markdown(f'<span class="cat-tag" style="background-color: {bg_color}; color: white;">{categoria_label}</span>', unsafe_allow_html=True)
+                # Aquí imprimimos solo la categoría limpia con su color
+                st.markdown(f'<span class="cat-tag" style="background-color: {bg_color}; color: white;">{clean_cat}</span>', unsafe_allow_html=True)
                 st.markdown(f'<div class="noticia-titulo">{row["Noticia"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<a href="{row["Link"]}" target="_blank" class="fuente-link">🔗 Leer fuente</a>', unsafe_allow_html=True)
-                st.caption(f"Fecha: {row.get('Fecha', 'Reciente')}")
 
             with col_anid:
                 st.markdown("**🧠 ANÁLISIS ESTRATÉGICO**")
-                st.markdown(f'<div class="analisis-box">{row["Analisis"]}</div>', unsafe_allow_html=True)
+                # Limpiamos el texto del análisis para que no muestre "SEPARADOR" ni "CATEGORIA"
+                texto_limpio = str(row["Analisis"]).replace("SEPARADOR", "").split("CATEGORIA:")[0].strip()
+                st.markdown(f'<div class="analisis-box">{texto_limpio}</div>', unsafe_allow_html=True)
             
             st.markdown('</div>', unsafe_allow_html=True)
 else:
