@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 
 # --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Public Go Elite v72", layout="wide")
+st.set_page_config(page_title="Public Go Elite v75", layout="wide")
 
 # --- 1. CONFIGURACIÓN DE LA FUENTE (GOOGLE SHEETS) ---
 SHEET_ID = "1147SVSNiHRlM74tVcn36T2PzMqTPOGulHcEt8AMKUMc" 
@@ -16,9 +16,9 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #003b5c !important; }
     [data-testid="stSidebar"] * { color: #ffffff !important; }
     .cat-tag { padding: 4px 12px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; display: inline-block; }
-    .report-card { background-color: #f8f9fa; padding: 20px; border-radius: 5px; border-top: 4px solid #003b5c; margin-bottom: 30px; box-shadow: 0px 4px 10px rgba(0,0,0,0.05); }
-    .noticia-titulo { color: #003b5c; font-weight: bold; font-size: 1.15rem; line-height: 1.3; margin-bottom: 10px; }
-    .analisis-box { background-color: #ffffff; padding: 15px; border-left: 4px solid #003b5c; border-radius: 4px; font-size: 0.95rem; color: #333; line-height: 1.5; }
+    .report-card { background-color: #f8f9fa; padding: 25px; border-radius: 5px; border-top: 4px solid #003b5c; margin-bottom: 35px; box-shadow: 0px 4px 10px rgba(0,0,0,0.05); }
+    .noticia-titulo { color: #003b5c; font-weight: bold; font-size: 1.2rem; line-height: 1.3; margin-bottom: 10px; }
+    .analisis-box { background-color: #ffffff; padding: 15px; border-left: 4px solid #003b5c; border-radius: 4px; font-size: 0.95rem; color: #333; line-height: 1.6; margin-bottom: 15px; }
     .fuente-link { color: #003b5c; text-decoration: none; font-weight: 600; font-size: 0.85rem; }
     </style>
     """, unsafe_allow_html=True)
@@ -34,7 +34,7 @@ def obtener_indicadores(alcance):
 def cargar_datos_estrategicos():
     try:
         df = pd.read_csv(SHEET_URL)
-        df.columns = df.columns.str.strip() # Limpia espacios en nombres de columnas
+        df.columns = df.columns.str.strip() 
         return df.iloc[::-1]
     except Exception as e:
         return pd.DataFrame()
@@ -61,10 +61,11 @@ if st.button("🔄 ACTUALIZAR REPORTES"):
 
 df_intel = cargar_datos_estrategicos()
 
-# Mapeo de colores para categorías
+# Mapeo oficial de colores
 color_map = {
     "PETRÓLEO": "#E67E22", "ECONOMÍA": "#27AE60", 
-    "POLÍTICA": "#2980B9", "RELACIONES INTERNACIONALES": "#C0392B"
+    "POLÍTICA": "#2980B9", "RELACIONES INTERNACIONALES": "#C0392B",
+    "GENERAL": "#7F8C8D"
 }
 
 if not df_intel.empty:
@@ -72,37 +73,57 @@ if not df_intel.empty:
         # --- LÓGICA DE LIMPIEZA DE CATEGORÍA ---
         raw_cat = str(row.get('Categoría', 'GENERAL')).upper()
         
-        # Esto extrae solo la palabra clave (ej: PETRÓLEO) aunque diga "CATEGORIA: PETRÓLEO"
         if "PETRÓLEO" in raw_cat or "PETROLEO" in raw_cat:
-            clean_cat, bg_color = "PETRÓLEO", "#E67E22"
+            clean_cat, bg_color = "PETRÓLEO", color_map["PETRÓLEO"]
         elif "ECONOMÍA" in raw_cat or "ECONOMIA" in raw_cat:
-            clean_cat, bg_color = "ECONOMÍA", "#27AE60"
+            clean_cat, bg_color = "ECONOMÍA", color_map["ECONOMÍA"]
         elif "POLÍTICA" in raw_cat or "POLITICA" in raw_cat:
-            clean_cat, bg_color = "POLÍTICA", "#2980B9"
+            clean_cat, bg_color = "POLÍTICA", color_map["POLÍTICA"]
         elif "RELACIONES" in raw_cat:
-            clean_cat, bg_color = "RELACIONES INTERNACIONALES", "#C0392B"
+            clean_cat, bg_color = "RELACIONES INTERNACIONALES", color_map["RELACIONES INTERNACIONALES"]
         else:
-            clean_cat, bg_color = "GENERAL", "#7F8C8D"
+            clean_cat, bg_color = "GENERAL", color_map["GENERAL"]
+
+        # --- PROCESAMIENTO ESTRUCTURADO DEL ANÁLISIS ---
+        # Limpieza inicial de etiquetas de control
+        texto_full = str(row["Analisis"]).replace("SEPARADOR", "").split("CATEGORIA:")[0].strip()
+        
+        # Segmentación: Buscamos la palabra "RECOMENDACIÓN" o el uso de negritas finales
+        if "RECOMENDACIÓN" in texto_full.upper():
+            partes = texto_full.upper().split("RECOMENDACIÓN", 1)
+            cuerpo = texto_full[:len(partes[0])].strip()
+            # Quitamos los dos puntos si existen al inicio de la recomendación
+            rec_texto = texto_full[len(partes[0])+14:].strip().lstrip(":") 
+        else:
+            # Si no hay palabra clave, intentamos separar por el último bloque en negrita
+            partes = texto_full.split("**")
+            if len(partes) > 1:
+                cuerpo = partes[0].strip()
+                rec_texto = partes[-1].strip()
+            else:
+                cuerpo = texto_full
+                rec_texto = ""
 
         with st.container():
             st.markdown(f'<div class="report-card">', unsafe_allow_html=True)
-            col_info, col_anid = st.columns([1.2, 2])
+            col_info, col_anid = st.columns([1, 2])
             
             with col_info:
-                # Aquí imprimimos solo la categoría limpia con su color
                 st.markdown(f'<span class="cat-tag" style="background-color: {bg_color}; color: white;">{clean_cat}</span>', unsafe_allow_html=True)
                 st.markdown(f'<div class="noticia-titulo">{row["Noticia"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<a href="{row["Link"]}" target="_blank" class="fuente-link">🔗 Leer fuente</a>', unsafe_allow_html=True)
+                st.markdown(f'<a href="{row["Link"]}" target="_blank" class="fuente-link">🔗 Leer fuente original</a>', unsafe_allow_html=True)
+                st.caption(f"📅 Corte Informativo")
 
             with col_anid:
-                st.markdown("**🧠 ANÁLISIS ESTRATÉGICO**")
-                # Limpiamos el texto del análisis para que no muestre "SEPARADOR" ni "CATEGORIA"
-                texto_limpio = str(row["Analisis"]).replace("SEPARADOR", "").split("CATEGORIA:")[0].strip()
-                st.markdown(f'<div class="analisis-box">{texto_limpio}</div>', unsafe_allow_html=True)
+                st.markdown("##### 🧠 Perspectiva Estratégica")
+                st.markdown(f'<div class="analisis-box">{cuerpo}</div>', unsafe_allow_html=True)
+                
+                if rec_texto:
+                    st.info(f"**💡 RECOMENDACIÓN EJECUTIVA:** \n{rec_texto}")
             
             st.markdown('</div>', unsafe_allow_html=True)
 else:
-    st.info("No hay datos nuevos. Verifica que Pabbly esté enviando la información a la Google Sheet.")
+    st.info("Sincronizando con la central de inteligencia...")
 
 st.divider()
 st.caption("Uso exclusivo Public Go Consultores.")
