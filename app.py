@@ -1,6 +1,14 @@
+import streamlit as st  # <--- ESTA LÍNEA DEBE IR PRIMERO
+import requests
+from bs4 import BeautifulSoup
+import google.generativeai as genai
+from datetime import datetime
+import urllib.parse
+
+# Ahora sí puedes usar st.cache_data
 @st.cache_data(ttl=600)
 def buscar_rss(query, periodo):
-    # 1. Definimos las fuentes prioritarias para Public Go
+    # (Aquí va el resto de la función que actualizamos antes)
     fuentes_lista = [
         "bancaynegocios.com", 
         "petroguia.com", 
@@ -10,14 +18,9 @@ def buscar_rss(query, periodo):
         "finanzasdigital.com"
     ]
     
-    # 2. Creamos el string de sitios: (site:medio1.com OR site:medio2.com)
     sitios_query = " OR ".join([f"site:{s}" for s in fuentes_lista])
-    
-    # 3. Construimos el query final:
-    # Intentamos primero en los medios clave, si no, Google News ampliará la búsqueda
     full_query = f"({query}) ({sitios_query})"
     
-    # 4. URL de Google News (HL y GL configurados para Venezuela)
     params = {
         "q": f"{full_query} when:{periodo}",
         "hl": "es-419",
@@ -25,9 +28,7 @@ def buscar_rss(query, periodo):
         "ceid": "VE:es-419"
     }
     
-    # Usamos requests.params para que la codificación sea perfecta
     url = "https://news.google.com/rss/search"
-    
     results = []
     try:
         r = requests.get(url, params=params, timeout=12)
@@ -35,7 +36,7 @@ def buscar_rss(query, periodo):
             soup = BeautifulSoup(r.text, 'xml')
             items = soup.find_all('item')
             
-            # Si no hay resultados con los medios específicos, buscamos en general
+            # Si la búsqueda cerrada falla, intentamos abierta
             if not items:
                 params["q"] = f"{query} when:{periodo}"
                 r = requests.get(url, params=params, timeout=12)
@@ -49,5 +50,6 @@ def buscar_rss(query, periodo):
                 })
     except Exception as e:
         st.error(f"Error en conexión: {e}")
-        
     return results
+
+# --- RESTO DEL CÓDIGO (Configuración de IA, Interfaz, etc.) ---
