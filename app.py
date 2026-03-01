@@ -59,8 +59,15 @@ with st.sidebar:
 st.title("🛡️ Public Go: Strategic Insight Dashboard")
 st.write(f"Corte Informativo: **{datetime.now().strftime('%d/%m/%Y')}**")
 
-# Categorías que queremos mostrar
-CATEGORIAS_FILTRO = ["GOBIERNO", "ENERGÍA", "ECONOMÍA", "RELACIONES"]
+# Dentro del bucle de noticias en tu código de Streamlit:
+color_map = {
+    "Política": "blue",
+    "Economía": "green",
+    "Petróleo": "orange",
+    "Relaciones Internacionales": "red"
+}
+cat = row['Categoría'].strip()
+st.sidebar.markdown(f":{color_map.get(cat, 'gray')}[● {cat}]")
 
 # Botón de actualización manual
 if st.button("🔄 SINCRONIZAR INTELIGENCIA"):
