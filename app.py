@@ -3,102 +3,57 @@ import pandas as pd
 from datetime import datetime
 
 # --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Public Go Elite v71", layout="wide")
+st.set_page_config(page_title="Public Go Elite v72", layout="wide")
 
-# --- 1. CONFIGURACIÓN DE LA FUENTE (PUENTE CON PABBLY) ---
-# Reemplaza con el ID de tu Google Sheet que configuramos en Pabbly
-SHEET_ID = "1147SVSNiHRlM74tVcn36T2PzMqTPOGulHcEt8AMKUMc"
+# --- 1. CONFIGURACIÓN DE LA FUENTE (GOOGLE SHEETS) ---
+# Asegúrate de que el ID sea el correcto y la hoja sea pública (Lector)
+SHEET_ID = "1147SVSNiHRlM74tVcn36T2PzMqTPOGulHcEt8AMKUMc" 
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv"
 
-# --- 2. ESTILOS VISUALES ORIGINALES ---
+# --- 2. ESTILOS VISUALES CORPORATIVOS ---
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
     [data-testid="stSidebar"] { background-color: #003b5c !important; }
     [data-testid="stSidebar"] * { color: #ffffff !important; }
-    .cat-header { background-color: #003b5c; color: white; padding: 10px; border-radius: 5px; font-weight: bold; margin-top: 25px; text-transform: uppercase; }
-    .analysis-box { background-color: #f8f9fa; padding: 18px; border-right: 5px solid #003b5c; border-radius: 5px; font-size: 0.95rem; line-height: 1.5; color: #333; margin-bottom: 20px; }
-    .news-item { border-bottom: 1px solid #f0f0f0; padding: 12px 0; }
-    .news-link { color: #003b5c; text-decoration: none; font-weight: 500; font-size: 1.05rem; }
-    .ref-tag { color: #003b5c; font-weight: bold; margin-right: 5px; }
+    .cat-tag { padding: 4px 10px; border-radius: 15px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; display: inline-block; }
+    .report-card { background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 6px solid #003b5c; margin-bottom: 25px; box-shadow: 2px 2px 12px rgba(0,0,0,0.06); }
+    .noticia-titulo { color: #003b5c; font-weight: bold; font-size: 1.25rem; line-height: 1.3; margin-bottom: 8px; }
+    .analisis-texto { color: #333; line-height: 1.6; font-size: 1rem; }
+    .fuente-link { color: #003b5c; text-decoration: none; font-weight: 600; font-size: 0.9rem; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. LÓGICA DE VARIACIÓN (SIDEBAR) ---
-def calcular_variacion_real(alcance):
+# --- 3. LÓGICA DE INDICADORES (SIDEBAR) ---
+def obtener_indicadores(alcance):
     tasa_actual = 417.3579
-    cierres = {"Hoy": 414.0594, "Semana": 412.2030, "Mes": 401.3055}
-    precio_previo = cierres.get(alcance)
-    variacion_pct = ((tasa_actual - precio_previo) / precio_previo) * 100
-    return tasa_actual, variacion_pct
+    variaciones = {"Hoy": +0.85, "Semana": +1.20, "Mes": +3.45}
+    return tasa_actual, variaciones.get(alcance, 0)
 
-# --- 4. CARGA DE DATOS DESDE GOOGLE SHEETS ---
-@st.cache_data(ttl=300) # Se actualiza cada 5 minutos automáticamente
-def cargar_inteligencia():
+# --- 4. MOTOR DE CARGA DE INTELIGENCIA ---
+@st.cache_data(ttl=300) # Se actualiza cada 5 minutos
+def cargar_datos_estrategicos():
     try:
         df = pd.read_csv(SHEET_URL)
-        # Aseguramos que las columnas existan (deben coincidir con tus cabeceras en la Sheet)
-        # Ordenamos para mostrar lo más reciente arriba
-        return df.iloc[::-1] 
+        # Limpiamos nombres de columnas por si acaso hay espacios
+        df.columns = df.columns.str.strip()
+        # Mostramos lo más reciente primero
+        return df.iloc[::-1]
     except Exception as e:
+        st.error(f"Error de conexión: {e}")
         return pd.DataFrame()
 
 # --- 5. INTERFAZ SIDEBAR ---
 with st.sidebar:
-    st.title("🛡️ Public Go")
-    alcance = st.radio("Filtro Temporal:", ["Hoy", "Semana", "Mes"])
+    st.image("https://via.placeholder.com/150x50?text=PUBLIC+GO", use_container_width=True) # Reemplaza con tu logo real
     st.divider()
-    tasa, variacion = calcular_variacion_real(alcance)
-    st.metric(label="Tasa Oficial BCV", value=f"{tasa:.4f} Bs", delta=f"{variacion:+.2f}%")
+    alcance = st.radio("Filtro de Entorno:", ["Hoy", "Semana", "Mes"])
+    
+    tasa, delta = obtener_indicadores(alcance)
+    st.metric(label="Tasa Oficial BCV", value=f"{tasa:.4f} Bs", delta=f"{delta}%")
     st.metric("Riesgo País (EMBI)", "18,450 bps", "-50 bps", delta_color="inverse")
+    
     st.divider()
-    st.write("📊 **Monitor de Energía**")
+    st.write("📊 **Monitor Energético**")
     st.caption("Cesta OPEP: $79.40 (+0.5%)")
-
-# --- 6. CUERPO PRINCIPAL ---
-st.title("🛡️ Public Go: Strategic Insight Dashboard")
-st.write(f"Corte Informativo: **{datetime.now().strftime('%d/%m/%Y')}**")
-
-# Dentro del bucle de noticias en tu código de Streamlit:
-color_map = {
-    "Política": "blue",
-    "Economía": "green",
-    "Petróleo": "orange",
-    "Relaciones Internacionales": "red"
-}
-cat = row['Categoría'].strip()
-st.sidebar.markdown(f":{color_map.get(cat, 'gray')}[● {cat}]")
-
-# Botón de actualización manual
-if st.button("🔄 SINCRONIZAR INTELIGENCIA"):
-    st.cache_data.clear()
-    st.rerun()
-
-df_intel = cargar_inteligencia()
-
-if not df_intel.empty:
-    # Mostramos los reportes procesados por Pabbly + Gemini
-    for index, row in df_intel.iterrows():
-        # Intentamos determinar la categoría por palabras clave si no la tienes en la Sheet
-        # O simplemente mostramos el flujo de noticias analizadas
-        st.markdown(f"<div class='cat-header'>ANÁLISIS ESTRATÉGICO</div>", unsafe_allow_html=True)
-        
-        col_n, col_d = st.columns([1.5, 2])
-        
-        with col_n:
-            st.write("**📌 Fuente Original**")
-            st.markdown(f"""
-                <div class='news-item'>
-                    <a href='{row['Link']}' target='_blank' class='news-link'>{row['Noticia']}</a>
-                    <p style='font-size: 0.8rem; color: gray;'>Fecha: {row['Fecha']}</p>
-                </div>
-            """, unsafe_allow_html=True)
-            
-        with col_d:
-            st.write("**🧠 Inteligencia Public Go**")
-            st.markdown(f"<div class='analysis-box'>{row['Analisis']}</div>", unsafe_allow_html=True)
-else:
-    st.warning("⚠️ No se encontraron datos en la base de datos. Asegúrate de que Pabbly haya procesado al menos una noticia y que el ID de la Google Sheet sea correcto.")
-
-st.divider()
-st.caption("Uso exclusivo Public Go Consultores. Sistema automatizado via Pabbly Connect.")
+    st.caption("Producción PDVSA: 87
