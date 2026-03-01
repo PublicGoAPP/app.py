@@ -7,7 +7,7 @@ st.set_page_config(page_title="Public Go Elite v71", layout="wide")
 
 # --- 1. CONFIGURACIÓN DE LA FUENTE (PUENTE CON PABBLY) ---
 # Reemplaza con el ID de tu Google Sheet que configuramos en Pabbly
-SHEET_ID = "1147SVSNiHRlM74tVcn36T2PzMqTPOGulHcEt8AMKUMc" 
+SHEET_ID = "1147SVSNiHRlM74tVcn36T2PzMqTPOGulHcEt8AMKUMc"
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv"
 
 # --- 2. ESTILOS VISUALES ORIGINALES ---
